@@ -4,12 +4,20 @@ on:
   push:
   pull_request:
 
+env:
+  TUTOR_REQUIRE_PG: "1"
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - name: Instala o Postgres (os testes de integração sobem um cluster descartável)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql
+          echo "PG_BIN=$(ls -d /usr/lib/postgresql/*/bin)" >> "$GITHUB_ENV"
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run pytest -q
