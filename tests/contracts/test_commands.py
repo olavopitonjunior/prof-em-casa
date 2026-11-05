@@ -491,3 +491,45 @@ def test_commands_are_frozen():
 def test_json_overflowing_float_is_rejected():
     body = json.dumps(cmd("submit_answer")).replace('"answer": 6', '"answer": 1e999')
     assert code_of(body) == "INVALID_PAYLOAD"
+
+
+# --- increment 2: teto de revisão (P12) ------------------------------------------------------
+
+
+def test_revision_upper_bound():
+    raw = {**BASE, "expected_revision": 2**31}
+    with pytest.raises(DomainError) as e:
+        parse_command(raw, "learner")
+    assert e.value.code == "INVALID_PAYLOAD"
+
+
+def test_revision_accepts_the_postgres_integer_maximum():
+    from app.domain.division.commands import MAX_REVISION
+
+    assert MAX_REVISION == 2_147_483_647
+    assert parse_command({**BASE, "expected_revision": MAX_REVISION}, "learner")
+
+
+def test_turn_epoch_shares_the_revision_cap():
+    raw = {
+        **BASE,
+        "type": "highlight_group",
+        "payload": {"group_id": "group-1"},
+        "expected_scene_revision": 0,
+        "turn_id": "t1",
+        "turn_epoch": 2**31,
+    }
+    with pytest.raises(DomainError) as e:
+        parse_command(raw, "tutor")
+    assert e.value.code == "INVALID_PAYLOAD"
+
+
+def test_load_json_object_is_public_and_strict():
+    from app.domain.division import commands
+
+    assert commands._load is commands.load_json_object
+    assert commands.load_json_object(b'{"command_id": "c1"}') == {"command_id": "c1"}
+    for bad in ("[1]", '{"a": 1, "a": 2}', "NaN", b"\xff"):
+        with pytest.raises(DomainError) as e:
+            commands.load_json_object(bad)
+        assert e.value.code == "INVALID_PAYLOAD"

@@ -710,3 +710,23 @@ def test_snapshot_never_shows_an_answer_outside_the_demonstration():
         scene=s.scene.__class__.model_validate({**dict(s.scene), "answer_display": 6})
     )
     assert public_snapshot(leaky, CONTENT)["scene"]["answer_display"] is None
+
+
+# --- increment 2, Task 2: session_id (P12) e snapshot da análise ------------------------------
+
+
+def test_session_id_mismatch_rejected():
+    e = _code(session_in_practice(), cmd("check_distribution", session_id="other"))
+    assert e.code == "INVALID_PAYLOAD" and e.detail == "session_id mismatch"
+
+
+def test_session_id_mismatch_is_checked_before_session_state_guards():
+    closed = run(session_in_practice(), cmd("close_session"))
+    assert _code(closed, cmd("check_distribution", session_id="other")).code == "INVALID_PAYLOAD"
+    # ... mas depois da autorização do ator.
+    tutor_move = cmd("move_piece", actor="tutor", session_id="other")
+    assert _code(session_in_practice(), tutor_move, as_actor="tutor").code == "ACTION_NOT_ALLOWED"
+
+
+def test_snapshot_analysis_is_null_before_any_photo():
+    assert public_snapshot(session_in_practice(), CONTENT)["analysis"] is None

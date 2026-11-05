@@ -101,7 +101,8 @@ _ShortText = Annotated[StrictStr, StringConstraints(min_length=1, max_length=500
 _LongText = Annotated[StrictStr, StringConstraints(min_length=1, max_length=2000)]
 _Number = Annotated[StrictInt, Field(ge=-9999, le=9999)]  # mesma faixa da observação
 _ClarifiedValue = _Number | _ShortText
-_Revision = Annotated[StrictInt, Field(ge=0)]
+MAX_REVISION = 2_147_483_647  # INTEGER do Postgres
+_Revision = Annotated[StrictInt, Field(ge=0, le=MAX_REVISION)]
 
 
 class CommandEnvelope(BaseModel):
@@ -529,7 +530,9 @@ def _check_finite(value: Any) -> None:
             _check_finite(item)
 
 
-def _load(raw: bytes | str | dict) -> dict[str, Any]:
+def load_json_object(raw: bytes | str | dict) -> dict[str, Any]:
+    """Lê o corpo como objeto JSON estrito (sem chaves duplicadas, NaN ou inf). Pública: a camada
+    `sessions` lê o `command_id` por aqui antes de chamar `parse_command`."""
     try:
         if isinstance(raw, (bytes, bytearray)):
             raw = bytes(raw).decode("utf-8")
@@ -545,9 +548,12 @@ def _load(raw: bytes | str | dict) -> dict[str, Any]:
     return raw
 
 
+_load = load_json_object  # nome antigo (incremento 1)
+
+
 def parse_command(raw: bytes | str | dict, actor: Actor) -> Command:
     """Valida o corpo de um comando e o ator que o enviou. `actor` é contexto, nunca JSON."""
-    data = _load(raw)
+    data = load_json_object(raw)
     if "actor" in data:
         raise DomainError("INVALID_PAYLOAD", "actor não é aceito no corpo")
     try:

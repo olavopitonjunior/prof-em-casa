@@ -61,6 +61,8 @@ def apply_command(
     # Autorização: um comando validado para um ator não vale como outro.
     if actor not in ALLOWED_ACTORS[ctype]:
         raise DomainError("ACTION_NOT_ALLOWED", f"{actor} cannot run {ctype}")
+    if command.session_id != session.session_id:
+        raise DomainError("INVALID_PAYLOAD", "session_id mismatch")
     # (1) sessão fechada
     if session.session_status == "closed":
         raise DomainError("ACTION_NOT_ALLOWED", "session_closed")
@@ -122,6 +124,18 @@ def _public_scene(session: SessionState, attempt: Attempt | None) -> dict[str, A
     return data
 
 
+def _public_analysis(session: SessionState) -> dict[str, Any] | None:
+    """Só o estado da análise: observação, `issues` e `facts` nunca saem (Parte II §4)."""
+    artifact = session.active_artifact
+    if artifact is None:
+        return None
+    return {
+        "artifact_id": artifact.artifact_id,
+        "artifact_version": artifact.artifact_version,
+        "status": "available" if session.observation is not None else "pending",
+    }
+
+
 def public_snapshot(session: SessionState, content: ContentPackage) -> dict[str, Any]:
     """Projeção pública: nunca inclui `private`, quociente, correção nem texto livre da criança."""
     attempt = session.active_attempt
@@ -152,4 +166,5 @@ def public_snapshot(session: SessionState, content: ContentPackage) -> dict[str,
         },
         "item": None if attempt is None else public_item(content.items[attempt.item_id]),
         "scene": _public_scene(session, attempt),
+        "analysis": _public_analysis(session),
     }

@@ -210,3 +210,41 @@ def session_in_transfer() -> SessionState:
     s = run(s, cmd("submit_answer", answer=6))
     s = run(s, cmd("submit_explanation", text="4 grupos de 6 dão 24"))
     return run(s, cmd("continue_after_explanation", reason="sufficient"))
+
+
+# --- Captura do caderno (increment 2, Task 2) ---------------------------------------------------
+
+
+def in_notebook_capture() -> SessionState:
+    """Prática -> enter_notebook(record_solution) -> open_notebook_capture."""
+    s = run(session_in_practice(), cmd("enter_notebook", intent="record_solution"))
+    return run(s, cmd("open_notebook_capture"))
+
+
+def submitted(s: SessionState, artifact_id: str, version: int, job_id: str) -> SessionState:
+    from app.domain.division.analysis import submit_artifact
+
+    return submit_artifact(
+        s,
+        attempt_id=s.active_attempt_id,
+        artifact_id=artifact_id,
+        artifact_version=version,
+        job_id=job_id,
+    ).session
+
+
+def in_review() -> SessionState:
+    """Foto 1 enviada (art-1 v1, job-1): fase notebook_review, análise pendente."""
+    return submitted(in_notebook_capture(), "art-1", 1, "job-1")
+
+
+def result_for(job_id: str, artifact_id: str, version: int, *, attempt_id=None, obs=None):
+    from app.domain.division.analysis import AnalysisResult
+
+    return AnalysisResult(
+        job_id=job_id,
+        artifact_id=artifact_id,
+        artifact_version=version,
+        attempt_id=attempt_id or "attempt-2-guided",
+        observation=obs or load_obs("observacao-5-5-5-5"),
+    )

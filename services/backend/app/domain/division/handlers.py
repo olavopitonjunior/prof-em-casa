@@ -1,4 +1,4 @@
-"""Handlers dos comandos executáveis no incremento 1 (regra (6) da ordem de guardas).
+"""Handlers dos comandos executáveis (incremento 1, mais o fluxo de captura do caderno) (regra (6) da ordem de guardas).
 
 Cada handler recebe um `Ctx` e devolve um `Outcome`: o novo estado SEM fase, revisões nem
 `last_event_seq` (o `apply_command` completa isso), os eventos e se a cena mudou. Handlers nunca
@@ -323,6 +323,34 @@ def return_to_activity(ctx: Ctx) -> Outcome:
     return Outcome(updated, [event])
 
 
+def open_notebook_capture(ctx: Ctx) -> Outcome:
+    """notebook -> notebook_capture (a fase vem da tabela). Sem evento: nada foi enviado ainda."""
+    return Outcome(ctx.session)
+
+
+def cancel_capture(ctx: Ctx) -> Outcome:
+    """notebook_capture -> notebook. Mantém o checkpoint e o artefato anterior, se houver."""
+    return Outcome(ctx.session)
+
+
+def retake_notebook_photo(ctx: Ctx) -> Outcome:
+    """notebook_review -> notebook_capture. A análise da foto descartada deixa de valer."""
+    s = ctx.session
+    events: list[DomainEvent] = []
+    if s.active_artifact is not None:
+        events.append(
+            _event(
+                "analysis_superseded",
+                s.active_attempt_id,
+                artifact_id=s.active_artifact.artifact_id,
+                job_id=s.active_artifact.job_id,
+                reason="retake",
+            )
+        )
+    updated = s.with_changes(active_artifact=None, observation=None, verification=None)
+    return Outcome(updated, events)
+
+
 def submit_answer(ctx: Ctx) -> Outcome:
     s, p = ctx.session, ctx.command.payload
     attempt = _active(s)
@@ -366,8 +394,14 @@ def continue_after_explanation(ctx: Ctx) -> Outcome:
     if attempt.kind != "guided":
         return Outcome(updated, events)
     transfer, _ = _start_attempt(s, "transfer", _item_by_role(ctx.content, "transfer"))
+    # A foto do caderno pertence à tentativa guiada: não passa para a questão nova.
     updated = updated.with_changes(
-        attempts=(*updated.attempts, transfer), active_attempt_id=transfer.attempt_id, scene=None
+        attempts=(*updated.attempts, transfer),
+        active_attempt_id=transfer.attempt_id,
+        scene=None,
+        active_artifact=None,
+        observation=None,
+        verification=None,
     )
     events += [
         _event("attempt_started", transfer.attempt_id, kind="transfer", item_id=transfer.item_id),
@@ -430,6 +464,9 @@ HANDLERS: dict[str, Callable[[Ctx], Outcome]] = {
     "request_help": request_help,
     "enter_notebook": enter_notebook,
     "return_to_activity": return_to_activity,
+    "open_notebook_capture": open_notebook_capture,
+    "cancel_capture": cancel_capture,
+    "retake_notebook_photo": retake_notebook_photo,
     "submit_answer": submit_answer,
     "submit_explanation": submit_explanation,
     "continue_after_explanation": continue_after_explanation,

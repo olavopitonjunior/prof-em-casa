@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from app.domain.division.assistance import AssistanceLedger
 from app.domain.division.classification import ExplanationResult
+from app.domain.division.observation import NotebookObservation, Verification
 from app.domain.division.scene import SceneState
 from app.domain.division.transitions import AttemptKind, Phase
 
@@ -52,6 +53,14 @@ class _Frozen(BaseModel):
         return type(self).model_validate({**dict(self), **changes})
 
 
+class ActiveArtifact(_Frozen):
+    """Foto do caderno em análise: só a última enviada vale (AC-33)."""
+
+    artifact_id: str
+    artifact_version: StrictInt = Field(ge=1)
+    job_id: str
+
+
 class Attempt(_Frozen):
     attempt_id: str
     kind: AttemptKind
@@ -80,6 +89,10 @@ class SessionState(_Frozen):
     return_phase: Phase | None = None
     notebook_intent: NotebookIntent | None = None
     completion: Completion | None = None
+    # Captura do caderno (AC-33): artefato vigente e o resultado da análise já aplicado.
+    active_artifact: ActiveArtifact | None = None
+    observation: NotebookObservation | None = None
+    verification: Verification | None = None
 
     @model_validator(mode="after")
     def _check_invariants(self) -> "SessionState":
