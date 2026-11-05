@@ -77,3 +77,105 @@ Não conta como pronto na demonstração:
   tem handler. Que ela não conta como ajuda conceitual está provado só nos testes unitários de
   `assistance` e `classification`, não em jornada completa.
 - Nenhum teste com crianças, e nenhuma afirmação sobre ganho de aprendizagem ou retenção.
+
+---
+
+# Registro de execução: incremento 2 (sessão persistida, comandos autorizados, idempotência e retomada)
+
+Escopo: camada `sessions/` sobre o domínio, banco (SQLite e Postgres) e rotas `/v1`; sem interface, voz, upload nem visão real
+
+Este registro atende à Spec, Parte III §1, para o incremento 2. Todas as fixtures são sintéticas
+(`model_ref` = `synthetic-fixture-not-a-model-run`; observações do caderno vindas de arquivos de
+`tests/fixtures`). Nenhuma criança participou de qualquer teste, e este documento não afirma ganho
+de aprendizagem.
+
+## Identificação (incremento 2)
+
+| Item | Valor |
+|---|---|
+| Versão do app (`pyproject.toml`) | 0.1.0 (a API declara `API_VERSION` 0.2.0) |
+| `content_version` | `division-sharing-v1` |
+| `schema_version` dos comandos | 1.0 |
+| Prompt / modelo | nenhum; o avaliador de explicação é o stub dos testes (D2). O de produção é o `UnavailableEvaluator` (P9), que responde 503 |
+| Python | 3.12.14 (`uv run python -V`) |
+| Sistema operacional | macOS 26.6.2 (build 25G83), arm64 |
+| Ferramentas | uv 0.12.5, pytest 9.2.0 |
+| Postgres (cluster descartável dos testes) | 17.11 (Homebrew), `initdb`/`pg_ctl` sob `tmp_path_factory`, porta livre em 127.0.0.1, parado no teardown |
+| SQLite (`sqlite3.sqlite_version`) | 3.53.1 |
+| Código sob teste | branch `feat/incremento-2-sessao`, base `09bcdc8`; último commit de código `0f938e5`. Os testes de aceite, o hook de rastreabilidade e este registro entram no commit seguinte |
+| Data | 2026-11-05 |
+
+## Comandos e resultado (incremento 2)
+
+| Comando | Resultado |
+|---|---|
+| `uv run pytest -q` | 1118 passed, 0 skipped |
+| `uv run pytest -q -m ac -rA` | 130 passed, 988 deselected; 17 ids com teste marcado e aprovado: os 16 exigidos (10 do incremento 1 e 7 do 2, com AC-27 nos dois) e AC-45, marcado a mais |
+| `TUTOR_REQUIRE_PG=1 uv run pytest -q -rs` | 1118 passed, 0 skipped (nenhum skip de Postgres) |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check services tests` | 68 files already formatted |
+
+Com `TUTOR_REQUIRE_PG=1`, a falta dos binários do Postgres falha o teste em vez de pulá-lo
+(`pg_cluster` em `tests/integration/conftest.py`). Sem a variável e sem Postgres, os testes
+parametrizados por `db_url` pulam a metade `postgres`; por isso esta execução com a variável é a
+que vale como evidência. O conjunto passou de 505 testes (incremento 1) para 1118.
+
+Em 05/11/2026 a execução emitiu um aviso (`StarletteDeprecationWarning`: o `TestClient` do
+Starlette prefere `httpx2` a `httpx`). Não afeta resultado.
+
+## Como a rastreabilidade funciona (incremento 2)
+
+- `tests/ac_traceability.py` agora exige `REQUIRED_ACS = INCREMENT_1_ACS | INCREMENT_2_ACS`.
+  `INCREMENT_2_ACS` = AC-26, 27, 33, 36, 37, 38 e 40. AC-27 está nos dois incrementos, então a
+  união tem 16 ids, não 17. O 17º id da lista de `-m ac` é AC-45, que tem teste marcado mas não é
+  exigido.
+- Há um teste de aceite por AC em `tests/acceptance/test_increment_2.py`, rodado em SQLite e em
+  Postgres (14 execuções). Cada jornada parte de `POST /v1/sessions` e avança só por HTTP:
+  `choose_reference_activity` (aluno), `run_demo_step` e `finish_demonstration` (token de serviço
+  `system`) e a prática. Exceção (P6): AC-33 e AC-37 chamam `SessionService.complete_analysis`
+  com o ator `vision_worker`, porque não há rota de análise neste incremento. A submissão do
+  artefato também vai direto ao serviço (`submit_notebook_artifact`), pelo mesmo motivo.
+- Os fixtures de banco (`db_url`, cluster Postgres descartável, `make_service`) são os de
+  `tests/integration/conftest.py`, reexportados por `tests/acceptance/conftest.py`. Quando a suíte
+  inteira roda, o cluster sobe uma vez para a integração e outra para o aceite.
+- Em `tests/test_ac_traceability.py`, um caso de pytester prova que, sem teste aprovado para
+  AC-38, a execução completa falha e lista `AC-38`.
+- O passo "esperar FAIL até `REQUIRED_ACS` incluir o incremento 2" do plano teve pouco efeito
+  prático: as Tasks 4 a 7 já tinham marcado os sete ids em seus testes de integração. O que ficou
+  vermelho primeiro foi o teste do próprio hook (`INCREMENT_2_ACS` inexistente).
+
+## Cobertura por AC (incremento 2)
+
+| AC | Teste de aceite (HTTP) | Parte comprovada | Outros testes marcados |
+|---|---|---|---|
+| AC-26 | `test_ac26_same_body_twice_has_one_effect` | mesmo corpo duas vezes: 200 nas duas, `Idempotent-Replay: true` na segunda, mesma resposta, uma revisão a mais, peça movida uma vez, um `scene_changed` | `test_http_replay_header_and_single_effect`; `test_ac26_same_command_twice_one_effect`; concorrência de duplicatas em `test_concurrent_duplicates_single_effect` (serviço, threads) |
+| AC-27 | `test_ac27_rejections_name_the_code_and_leave_no_trace` | `IDEMPOTENCY_CONFLICT` (409), `STALE_REVISION` (409), `ATTEMPT_CHANGED` (409), `INVALID_SCENE` (422); snapshot idêntico e nenhum evento novo após cada rejeição; a rejeição não ocupa o `command_id` (P5) | `test_ac27_http_codes`; `test_ac27_errors_leave_no_partial_mutation` (serviço) |
+| AC-33 | `test_ac33_slow_v1_does_not_overwrite_v2` | v1 chega depois da v2 e fica `superseded`, sem sobrescrever; v2 é aplicada; resultado de uma foto de tentativa antiga fica `superseded` e a questão nova não herda a análise | `test_ac33_slow_v1_does_not_overwrite_v2` e `test_ac33_result_after_attempt_changed_is_superseded` em `test_session_analysis.py` (serviço) |
+| AC-36 | `test_ac36_lost_response_is_replayed_and_state_is_reconcilable` | resposta perdida e corpo reenviado: replay, peça movida uma vez; `GET` do snapshot e `GET /events?after_seq=` concordam sobre o estado confirmado | `test_replay_after_revision_advanced_returns_original` |
+| AC-37 | `test_ac37_pause_defers_and_closed_session_discards` | pausa: resultado fica `deferred`, sem mudança nem evento, e a retomada o aplica numa só revisão (`session_resumed` + `analysis_completed`); sessão fechada: resultado tardio descartado, nada muda; tutor recusado em sessão pausada e em fechada (403 `ACTION_NOT_ALLOWED`) | `test_ac37_*` em `test_session_analysis.py` |
+| AC-38 | `test_ac38_second_tab_takes_control_without_forking_state` | `claim-control` sobe a geração para 2; a aba A perde escrita e ACK (403 `CONTROL_LOST`); as duas abas leem o mesmo estado; a aba B continua escrevendo | `test_ac38_second_tab_takes_control`; `test_concurrent_claims_have_one_winner` |
+| AC-40 | `test_ac40_credential_of_a_sees_nothing_of_b` | token da sessão A nas cinco rotas da sessão B (snapshot, comandos com `command_id` conhecido de B, `claim-control`, ACK, eventos): 404 idêntico byte a byte ao de sessão inexistente, sem o id de B; B não muda | `test_ac40_token_a_on_session_b`; `test_ac40_service_token_on_missing_session_is_the_same_404`; `test_ac40_service_level_cross_session` (serviço) |
+
+## Não comprovado neste incremento
+
+Não conta como pronto na demonstração:
+
+- Rotas de upload, de análise e `voice-token`. AC-33 e AC-37 provam o domínio e o caso de uso com
+  o worker stub; a rota `/analyses` e o worker real ficam no incremento 4, e o token de voz
+  restrito à sala no incremento 5. AC-40 cobre sessão, comandos, controle, ACK e eventos; upload,
+  análise e `voice-token` entram depois, com o mesmo `authenticate`.
+- A parte de interface do AC-36: o descarte da prévia de gesto na tela (incremento 3). Aqui só se
+  prova o servidor (replay sem duplicar; snapshot e eventos para reconciliar).
+- A interface de leitura da segunda aba (AC-38, incremento 3).
+- ACK com efeito e fala do tutor (AC-28 a AC-32): o ACK é gravado e validado, mas nada espera por
+  ele nem fala.
+- Limpeza dos dados em 24 h (AC-46). A sessão expira em 24 h (P11) e responde 404, mas nenhum
+  processo apaga as linhas.
+- Throttle de criação de sessão (`SESSION_LIMIT`) e CORS: o código existe no catálogo, nada o
+  emite (incremento de deploy, G7).
+- O Postgres dos testes é um cluster local descartável com `fsync` desligado; não é o Supabase
+  real. A migration SQL é comparada com o schema do código por teste, mas nunca foi aplicada num
+  projeto Supabase.
+- R19: a fase `explanation` revela a correção da questão nova (ver DECISOES-INCREMENTO-2). A
+  decisão é do usuário.
+- Nenhum teste com crianças, e nenhuma afirmação sobre ganho de aprendizagem ou retenção.

@@ -25,12 +25,12 @@ Registro das decisões tomadas durante a execução por subagentes em 05/11/2026
 - R14: request_help.kind = HelpKind − {procedural, accessibility} (6 valores) — D3 aprovada pelo usuário prevalece sobre a tabela da Spec §3 — custo se errado: nenhum (D3 explícita). Spec.md precisa ser atualizada (junto com D7).
 - R15: turn_id/turn_epoch opcionais em par para system/vision_worker (Spec §2 omissa) — custo se errado: tornar obrigatório.
 - R16: arestas D7 além da Spec aceitas (submit_answer correto practice→explanation; return_to_activity explanation→practice/transfer; request_reconstruction notebook_review→correction; request_help em notebook; transfer→summary com sessão ativa até close_session; evento returned_to_activity) — custo se errado: ajuste na tabela TRANSITIONS; Spec.md precisa ser atualizada pelo usuário.
-- R17: turn_epoch do tutor não validado no incremento 1 (sem handlers de tutor executáveis) — custo se errado: 1 guarda no incremento 5.
+- R17: turn_epoch do tutor não validado no incremento 1 (sem handlers de tutor executáveis) — custo se errado: 1 guarda no incremento 5. _Atualização (incremento 2): resolvido na camada de sessão pelo R30 (comando de tutor com `turn_epoch` diferente do vigente é rejeitado com `STALE_TURN`), commit `7a306fb`. O domínio em si segue sem a guarda._
 - R18: ambiguidade em /expression/* não é clarificável no incremento 1 (Clarification só aceita /groups/{i}/count) → fica inconclusive — conservador — custo se errado: ampliar Clarification no incremento 4.
 
 ## Pendências para incrementos seguintes
 
-- Spec.md precisa ser atualizada pelo usuário: D3 (tipos de ajuda) e arestas extras de transição (R16).
-- Avaliador de explicação que lança exceção escapa sem `DomainError` (fronteira do avaliador real, incremento 3+).
-- `answer_submitted` carrega correct/answer (projeção de eventos no incremento 2); `_Revision` sem limite superior; `session_id` não conferido.
-- Textos em pt-BR precisam de leitura pedagógica do usuário.
+- Spec.md precisa ser atualizada pelo usuário: D3 (tipos de ajuda) e arestas extras de transição (R16). _Atualização (incremento 2): continua pendente, e a lista cresceu; ver "Atualizações pendentes no Spec.md" em DECISOES-INCREMENTO-2._
+- Avaliador de explicação que lança exceção escapa sem `DomainError` (fronteira do avaliador real, incremento 3+). _Atualização (incremento 2): continua pendente para o avaliador real. O de produção hoje é o `UnavailableEvaluator` (P9), que levanta `PROVIDER_UNAVAILABLE`, e qualquer outra exceção vira `INTERNAL_ERROR` (500) no envelope, commit `0f938e5`._
+- `answer_submitted` carrega correct/answer (projeção de eventos no incremento 2); `_Revision` sem limite superior; `session_id` não conferido. _Atualização (incremento 2): os três estão resolvidos. A projeção por lista de permitidos (P8) tira `answer`, `correct` e afins dos eventos do aluno, commit `c501359`. O teto `le=2_147_483_647` do `_Revision` e a conferência do `session_id` (`INVALID_PAYLOAD`, P12) entraram no commit `e8bf45e`. Resta o teto nos campos de revisão do próprio `SessionState` (ver DECISOES-INCREMENTO-2, "Parked")._
+- Textos em pt-BR precisam de leitura pedagógica do usuário. _Atualização (incremento 2): continua pendente; o incremento 2 não mexeu nos textos._

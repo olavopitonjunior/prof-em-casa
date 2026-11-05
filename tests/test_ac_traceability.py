@@ -28,7 +28,7 @@ def test_unmarked():
 
 @pytest.fixture
 def inner(pytester, monkeypatch):
-    monkeypatch.setattr(ac_traceability, "INCREMENT_1_ACS", frozenset({"AC-01", "AC-02"}))
+    monkeypatch.setattr(ac_traceability, "REQUIRED_ACS", frozenset({"AC-01", "AC-02"}))
     pytester.makeini("[pytest]\nmarkers =\n    ac(*ids): critério de aceite\n")
     pytester.makeconftest(CONFTEST)
     return pytester
@@ -116,3 +116,27 @@ def test_the_real_required_set_is_the_ten_acs_of_increment_1():
     assert ac_traceability.INCREMENT_1_ACS == frozenset(
         {"AC-03", "AC-04", "AC-05", "AC-06", "AC-21", "AC-22", "AC-23", "AC-24", "AC-27", "AC-39"}
     )
+
+
+def test_the_real_required_set_adds_the_seven_acs_of_increment_2():
+    assert ac_traceability.INCREMENT_2_ACS == frozenset(
+        {"AC-26", "AC-27", "AC-33", "AC-36", "AC-37", "AC-38", "AC-40"}
+    )
+    # AC-27 aparece nos dois incrementos (o 2 fecha o IDEMPOTENCY_CONFLICT): a união tem 16 ids.
+    assert ac_traceability.REQUIRED_ACS == (
+        ac_traceability.INCREMENT_1_ACS | ac_traceability.INCREMENT_2_ACS
+    )
+    assert len(ac_traceability.REQUIRED_ACS) == 16
+
+
+def test_without_a_passing_ac38_test_the_full_run_fails_and_lists_it(inner, monkeypatch):
+    monkeypatch.setattr(ac_traceability, "REQUIRED_ACS", ac_traceability.INCREMENT_2_ACS)
+    tests = "\n".join(
+        f'@pytest.mark.ac("{ac}")\ndef test_{ac.lower().replace("-", "_")}():\n    pass\n'
+        for ac in sorted(ac_traceability.INCREMENT_2_ACS - {"AC-38"})
+    )
+    inner.makepyfile(test_a="import pytest\n\n" + tests)
+    r = inner.runpytest()
+    assert r.ret == pytest.ExitCode.TESTS_FAILED
+    r.stdout.fnmatch_lines(["*AC sem teste marcado e aprovado*AC-38*"])
+    assert not any("AC-26" in line and "sem teste" in line for line in r.outlines)
