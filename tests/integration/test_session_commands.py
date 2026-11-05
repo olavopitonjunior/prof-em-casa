@@ -661,6 +661,68 @@ def test_duplicates_that_all_passed_the_lookup_before_any_commit(
     assert count_events(svc, sid, "scene_changed", after=R) == 1
 
 
+def test_concurrent_same_command_id_other_body_one_accepted(svc, learner_in_practice):
+    """Mesmo command_id com corpos diferentes ao mesmo tempo: um só vence, o resto é conflito."""
+    ctx, sid = learner_in_practice
+    R, S = revisions(svc, sid)
+
+    def move(i):
+        body = move_body(svc, sid, rev=R, scene_rev=S, cmd_id="c-same", piece=f"piece-{i + 1:02d}")
+        return svc.execute_command(ctx, sid, body)
+
+    results = run_parallel(6, move)
+    accepted = [r for r in results if not isinstance(r, Exception)]
+    errors = [r for r in results if isinstance(r, Exception)]
+    assert len(accepted) == 1 and not accepted[0].replay
+    assert len(errors) == 5 and all(isinstance(e, SessionError) for e in errors), errors
+    assert {e.code for e in errors} == {"IDEMPOTENCY_CONFLICT"}
+    assert revisions(svc, sid) == (R + 1, S + 1)
+    assert count_events(svc, sid, "scene_changed", after=R) == 1
+    with svc.engine.connect() as conn:
+        rows = conn.execute(
+            select(func.count())
+            .select_from(command_results)
+            .where(command_results.c.command_id == "c-same")
+        ).scalar_one()
+    assert rows == 1
+
+
+# --- R28 / AC-45: o texto livre da criança não é gravado em lugar nenhum ---------------------
+
+SENTINEL = "Maria Silva 123"
+
+
+def _raw_text_of_every_row(engine, sid) -> list[str]:
+    """Todo texto gravado para a sessão: JSON cru de cada linha de cada tabela."""
+    texts = []
+    with engine.connect() as conn:
+        for table in (sessions, session_events, command_results, attempts, session_credentials):
+            query = select(table).where(table.c.session_id == sid)
+            texts.extend(
+                json.dumps(dict(r), default=str, ensure_ascii=False)
+                for r in conn.execute(query).mappings()
+            )
+    return texts
+
+
+@pytest.mark.ac("AC-45")
+@pytest.mark.parametrize("kind", ["prompt", "worked_step", "virtual_objects"])
+def test_request_help_reason_is_never_persisted(svc, learner_in_practice, kind):
+    ctx, sid = learner_in_practice
+    result = send(svc, ctx, sid, cmd("request_help", kind=kind, reason=SENTINEL))
+    assert SENTINEL not in json.dumps(result.body, ensure_ascii=False)
+    granted = event_rows(svc.engine, sid, "help_granted")
+    assert granted and all(e["data"].get("has_reason") is True for e in granted)
+    assert all("reason" not in e["data"] for e in granted)
+    texts = _raw_text_of_every_row(svc.engine, sid)
+    assert texts, "o teste precisa ler linhas de verdade"
+    for text in texts:
+        assert SENTINEL not in text
+        assert "Maria" not in text
+    state = state_of(svc, sid)
+    assert SENTINEL not in state.model_dump_json()
+
+
 def test_concurrent_distinct_commands_same_revision_one_wins(svc, learner_in_practice):
     ctx, sid = learner_in_practice
     R, S = revisions(svc, sid)

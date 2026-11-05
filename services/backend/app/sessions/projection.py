@@ -77,7 +77,7 @@ LEARNER_EVENT_FIELDS: dict[str, frozenset[str]] = {
         "intervention",
         "intervention_targets",
     ),
-    "help_granted": _f("kind", "assistance_level", "support_resources"),
+    "help_granted": _f("kind", "assistance_level", "support_resources", "has_reason"),
     "notebook_entered": _f("intent", "return_phase"),
     "returned_to_activity": _f("from_phase", "to_phase"),
     "artifact_submitted": _f("artifact_id", "artifact_version"),
@@ -99,10 +99,9 @@ LEARNER_EVENT_FIELDS: dict[str, frozenset[str]] = {
 # - rating/evidence: a nota da explicação e o que o avaliador viu;
 # - outcome/final: o resultado classificado da tentativa;
 # - verification_status/issues/reconstruction_allowed: dizem se o caderno está certo;
-# - reason em help_granted: texto livre da criança;
+# - reason (texto livre da criança) nunca é emitido: help_granted leva só has_reason (R28);
 # - job_id: identificador interno do trabalho de análise.
 LEARNER_EXCLUDED_FIELDS: dict[str, frozenset[str]] = {
-    "help_granted": _f("reason"),
     "artifact_submitted": _f("job_id"),
     "analysis_completed": _f("job_id", "verification_status", "issues", "reconstruction_allowed"),
     "analysis_superseded": _f("job_id"),

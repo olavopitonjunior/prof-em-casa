@@ -269,13 +269,13 @@ def request_help(ctx: Ctx) -> Outcome:
         # D4: só existe roteiro 20+4 para o item 24÷4.
         raise DomainError("UNSUPPORTED_CONTENT", "alternate_strategy has no script for this item")
     # A assistência é gravada antes de qualquer recurso ser liberado (Parte I §7).
-    attempt = attempt.with_changes(ledger=apply_help_effect(attempt.ledger, p.kind, p.reason))
+    attempt = attempt.with_changes(ledger=apply_help_effect(attempt.ledger, p.kind))
     events = [
         _event(
             "help_granted",
             attempt.attempt_id,
             kind=p.kind,
-            reason=p.reason,
+            has_reason=bool(p.reason),  # o texto da criança não vira evento (R28, AC-45)
             **_help_snapshot(attempt),
         )
     ]
@@ -304,11 +304,7 @@ def enter_notebook(ctx: Ctx) -> Outcome:
     if intent == "try_on_paper":  # papel é recurso de apoio, não ajuda: o nível não sobe
         attempt = _active(s)
         ledger = attempt.ledger
-        paper = AssistanceLedger(
-            level=ledger.level,
-            resources=ledger.resources | {"paper"},
-            reasons=ledger.reasons,
-        )
+        paper = AssistanceLedger(level=ledger.level, resources=ledger.resources | {"paper"})
         updated = _with_attempt(updated, attempt.with_changes(ledger=paper))
     event = _event(
         "notebook_entered", s.active_attempt_id, intent=intent, return_phase=return_phase

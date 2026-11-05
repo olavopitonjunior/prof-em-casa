@@ -489,8 +489,18 @@ def test_conceptual_help_raises_the_ledger_and_never_lowers_it():
     s = run(s, cmd("request_help", kind="worked_step", reason="não sei"))
     s = run(s, cmd("request_help", kind="prompt", reason="outra"))
     ledger = attempt(s, "guided").ledger
-    assert ledger.level == "demonstrated" and len(ledger.reasons) == 2
+    assert ledger.level == "demonstrated"
     assert public_snapshot(s, CONTENT)["attempt"]["assistance_level"] == "demonstrated"
+
+
+def test_help_reason_text_is_not_kept_in_state_or_events():
+    """R28 / AC-45: o texto livre da criança não fica no estado nem no evento; só `has_reason`."""
+    secret = "Maria Silva 123"
+    r = apply(session_in_practice(), cmd("request_help", kind="prompt", reason=secret))
+    assert secret not in r.session.model_dump_json()
+    granted = [e for e in r.events if e.type == "help_granted"]
+    assert len(granted) == 1 and granted[0].data["has_reason"] is True
+    assert secret not in repr([e.data for e in r.events])
 
 
 def test_alternate_strategy_is_allowed_in_the_guided_item():
@@ -502,7 +512,6 @@ def test_try_on_paper_adds_the_paper_resource_without_raising_the_level():
     n = run(session_in_practice(), cmd("enter_notebook", intent="try_on_paper"))
     ledger = attempt(n, "guided").ledger
     assert ledger.resources == frozenset({"paper"}) and ledger.level == "none"
-    assert ledger.reasons == ()
     again = run(run(n, cmd("return_to_activity")), cmd("enter_notebook", intent="try_on_paper"))
     assert attempt(again, "guided").ledger == ledger  # idempotente
 

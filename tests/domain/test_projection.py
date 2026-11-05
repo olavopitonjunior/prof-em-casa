@@ -279,15 +279,17 @@ def test_learner_envelope_has_no_actor_or_command_id():
     assert projected["occurred_at"] == record.occurred_at.isoformat()
 
 
-def test_help_granted_keeps_levels_and_drops_the_free_text_reason():
+def test_help_granted_never_carries_the_free_text_reason():
     helps = [r for r in records(_emitted()) if r.type == "help_granted"]
     assert helps
     for record in helps:
-        assert "reason" in record.data
+        assert "reason" not in record.data  # R28: o texto da criança não é emitido
+        assert record.data["has_reason"] is True
         assert set(project_event(record, "learner")["data"]) == {
             "kind",
             "assistance_level",
             "support_resources",
+            "has_reason",
         }
 
 
