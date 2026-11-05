@@ -23,8 +23,8 @@ def test_ac22_applied_without_item_help():
 
 @pytest.mark.ac("AC-24")
 def test_accessibility_and_procedural_keep_without_item_help():
-    ledger = apply_help_effect(AssistanceLedger(), "procedural", "onde envio?")
-    ledger = apply_help_effect(ledger, "accessibility", "fonte maior")
+    ledger = apply_help_effect(AssistanceLedger(), "procedural")
+    ledger = apply_help_effect(ledger, "accessibility")
     assert classify_attempt(True, S, ledger) == "applied_without_item_help"
 
 
@@ -42,12 +42,12 @@ def test_partial_or_unclear_explanation_is_partial_evidence(explanation):
 
 @pytest.mark.ac("AC-24")
 def test_ac24_objects_make_it_supported():
-    ledger = apply_help_effect(AssistanceLedger(), "virtual_objects", "pediu objetos")
+    ledger = apply_help_effect(AssistanceLedger(), "virtual_objects")
     assert classify_attempt(True, S, ledger) == "applied_with_support"
 
 
 def test_reference_model_makes_it_supported():
-    ledger = apply_help_effect(AssistanceLedger(), "reference_model", "pediu modelo")
+    ledger = apply_help_effect(AssistanceLedger(), "reference_model")
     assert classify_attempt(True, S, ledger) == "applied_with_support"
 
 
@@ -58,7 +58,7 @@ def test_counting_aid_is_a_conceptual_resource():
 
 @pytest.mark.parametrize("kind", ["prompt", "visual_hint", "worked_step", "alternate_strategy"])
 def test_conceptual_help_makes_it_supported(kind):
-    ledger = apply_help_effect(AssistanceLedger(), kind, "r")
+    ledger = apply_help_effect(AssistanceLedger(), kind)
     assert classify_attempt(True, S, ledger) == "applied_with_support"
 
 
@@ -70,13 +70,13 @@ def test_text_rephrase_is_not_a_conceptual_resource():
 def test_spec_wins_support_needs_sufficient_explanation():
     # Spec "Classificação final": applied_with_support exige explicação suficiente;
     # resposta correta com explicação parcial/ausente é answer_correct_evidence_partial.
-    ledger = apply_help_effect(AssistanceLedger(), "worked_step", "r")
+    ledger = apply_help_effect(AssistanceLedger(), "worked_step")
     assert classify_attempt(True, None, ledger) == "answer_correct_evidence_partial"
     assert classify_attempt(True, P, ledger) == "answer_correct_evidence_partial"
 
 
 def test_wrong_answer_needs_review_even_with_help():
-    ledger = apply_help_effect(AssistanceLedger(), "worked_step", "r")
+    ledger = apply_help_effect(AssistanceLedger(), "worked_step")
     assert classify_attempt(False, S, AssistanceLedger()) == "needs_review"
     assert classify_attempt(False, None, ledger) == "needs_review"
 

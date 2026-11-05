@@ -1,0 +1,4870 @@
+{
+  "components": {
+    "schemas": {
+      "ApplyHelpCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ApplyHelpPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "apply_help",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ApplyHelpCommand",
+        "type": "object"
+      },
+      "ApplyHelpPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "intervention_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Intervention Id",
+            "type": "string"
+          },
+          "step_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Step Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "intervention_id",
+          "step_id"
+        ],
+        "title": "ApplyHelpPayload",
+        "type": "object"
+      },
+      "CancelCaptureCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CancelCapturePayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "cancel_capture",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "CancelCaptureCommand",
+        "type": "object"
+      },
+      "CancelCapturePayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "CancelCapturePayload",
+        "type": "object"
+      },
+      "CheckDistributionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CheckDistributionPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "check_distribution",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "CheckDistributionCommand",
+        "type": "object"
+      },
+      "CheckDistributionPayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "CheckDistributionPayload",
+        "type": "object"
+      },
+      "ChooseReferenceActivityCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ChooseReferenceActivityPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "choose_reference_activity",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ChooseReferenceActivityCommand",
+        "type": "object"
+      },
+      "ChooseReferenceActivityPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "content_version": {
+            "const": "division-sharing-v1",
+            "title": "Content Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content_version"
+        ],
+        "title": "ChooseReferenceActivityPayload",
+        "type": "object"
+      },
+      "ClaimControlRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_revision"
+        ],
+        "title": "ClaimControlRequest",
+        "type": "object"
+      },
+      "ClaimControlResponse": {
+        "properties": {
+          "connection_generation": {
+            "title": "Connection Generation",
+            "type": "integer"
+          },
+          "controller_id": {
+            "title": "Controller Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "turn_epoch": {
+            "title": "Turn Epoch",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "controller_id",
+          "connection_generation",
+          "revision",
+          "turn_epoch"
+        ],
+        "title": "ClaimControlResponse",
+        "type": "object"
+      },
+      "ClarifyObservationCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ClarifyObservationPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "clarify_observation",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ClarifyObservationCommand",
+        "type": "object"
+      },
+      "ClarifyObservationPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "field_path": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.\\[\\]-]+$",
+            "title": "Field Path",
+            "type": "string"
+          },
+          "observation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Observation Id",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 9999,
+                "minimum": -9999,
+                "type": "integer"
+              },
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "observation_id",
+          "field_path",
+          "value"
+        ],
+        "title": "ClarifyObservationPayload",
+        "type": "object"
+      },
+      "ClarifySourceCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ClarifySourcePayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "clarify_source",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ClarifySourceCommand",
+        "type": "object"
+      },
+      "ClarifySourcePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "field_path": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.\\[\\]-]+$",
+            "title": "Field Path",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 9999,
+                "minimum": -9999,
+                "type": "integer"
+              },
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "analysis_id",
+          "field_path",
+          "value"
+        ],
+        "title": "ClarifySourcePayload",
+        "type": "object"
+      },
+      "CloseSessionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CloseSessionPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "close_session",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "CloseSessionCommand",
+        "type": "object"
+      },
+      "CloseSessionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "completed",
+              "learner_stopped",
+              "limit_reached"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "CloseSessionPayload",
+        "type": "object"
+      },
+      "CommandAccepted": {
+        "properties": {
+          "command_id": {
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_seq": {
+            "title": "Event Seq",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "scene_effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SceneEffect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scene_revision": {
+            "title": "Scene Revision",
+            "type": "integer"
+          },
+          "status": {
+            "const": "accepted",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "status",
+          "revision",
+          "scene_revision",
+          "event_seq",
+          "scene_effect"
+        ],
+        "title": "CommandAccepted",
+        "type": "object"
+      },
+      "ConfirmSourceCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ConfirmSourcePayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "confirm_source",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ConfirmSourceCommand",
+        "type": "object"
+      },
+      "ConfirmSourcePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "item_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "analysis_id",
+          "item_id"
+        ],
+        "title": "ConfirmSourcePayload",
+        "type": "object"
+      },
+      "ContinueAfterExplanationCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ContinueAfterExplanationPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "continue_after_explanation",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ContinueAfterExplanationCommand",
+        "type": "object"
+      },
+      "ContinueAfterExplanationPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "sufficient",
+              "learner_skipped"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ContinueAfterExplanationPayload",
+        "type": "object"
+      },
+      "CreateSessionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "content_version": {
+            "title": "Content Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "content_version"
+        ],
+        "title": "CreateSessionRequest",
+        "type": "object"
+      },
+      "CreatedSessionResponse": {
+        "properties": {
+          "connection_generation": {
+            "title": "Connection Generation",
+            "type": "integer"
+          },
+          "controller_id": {
+            "title": "Controller Id",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_token": {
+            "title": "Session Token",
+            "type": "string"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "title": "Snapshot",
+            "type": "object"
+          }
+        },
+        "required": [
+          "session_id",
+          "session_token",
+          "controller_id",
+          "connection_generation",
+          "snapshot"
+        ],
+        "title": "CreatedSessionResponse",
+        "type": "object"
+      },
+      "DisputeObservationCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DisputeObservationPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "dispute_observation",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "DisputeObservationCommand",
+        "type": "object"
+      },
+      "DisputeObservationPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "field_path": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.\\[\\]-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Path"
+          },
+          "observation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Observation Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "observation_id"
+        ],
+        "title": "DisputeObservationPayload",
+        "type": "object"
+      },
+      "EnterNotebookCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/EnterNotebookPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "enter_notebook",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "EnterNotebookCommand",
+        "type": "object"
+      },
+      "EnterNotebookPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "intent": {
+            "enum": [
+              "record_solution",
+              "try_on_paper",
+              "revise_record"
+            ],
+            "title": "Intent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "intent"
+        ],
+        "title": "EnterNotebookPayload",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "enum": [
+              "INVALID_PAYLOAD",
+              "UNAUTHENTICATED",
+              "ACTION_NOT_ALLOWED",
+              "CONTROL_LOST",
+              "NOT_FOUND",
+              "STALE_REVISION",
+              "STALE_SCENE",
+              "STALE_TURN",
+              "ATTEMPT_CHANGED",
+              "IDEMPOTENCY_CONFLICT",
+              "INVALID_TRANSITION",
+              "IMAGE_TOO_LARGE",
+              "UNSUPPORTED_IMAGE",
+              "INVALID_SCENE",
+              "NO_OP",
+              "UNSUPPORTED_CONTENT",
+              "SESSION_LIMIT",
+              "PROVIDER_UNAVAILABLE",
+              "PAYLOAD_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "METHOD_NOT_ALLOWED",
+              "UNSUPPORTED_MEDIA_TYPE"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "current_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Revision"
+          },
+          "current_scene_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Scene Revision"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Só para tutor e atores de serviço (R29); o aluno nunca recebe este campo.",
+            "title": "Detail"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "retryable"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "command_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Eco do id do comando, só quando ele tem formato válido.",
+            "title": "Command Id"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "EventsResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "EventsResponse",
+        "type": "object"
+      },
+      "FinishDemonstrationCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/FinishDemonstrationPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "finish_demonstration",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "FinishDemonstrationCommand",
+        "type": "object"
+      },
+      "FinishDemonstrationPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "completed",
+              "learner_requested"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "FinishDemonstrationPayload",
+        "type": "object"
+      },
+      "HighlightAvailableCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/HighlightAvailablePayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "highlight_available",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "HighlightAvailableCommand",
+        "type": "object"
+      },
+      "HighlightAvailablePayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "HighlightAvailablePayload",
+        "type": "object"
+      },
+      "HighlightGroupCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/HighlightGroupPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "highlight_group",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "HighlightGroupCommand",
+        "type": "object"
+      },
+      "HighlightGroupPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "group_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "HighlightGroupPayload",
+        "type": "object"
+      },
+      "InterruptTurnCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/InterruptTurnPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "interrupt_turn",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "InterruptTurnCommand",
+        "type": "object"
+      },
+      "InterruptTurnPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "turn_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id"
+        ],
+        "title": "InterruptTurnPayload",
+        "type": "object"
+      },
+      "MovePieceCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/MovePiecePayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "move_piece",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "MovePieceCommand",
+        "type": "object"
+      },
+      "MovePiecePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "from_location": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "From Location",
+            "type": "string"
+          },
+          "piece_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Piece Id",
+            "type": "string"
+          },
+          "to_location": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "To Location",
+            "type": "string"
+          }
+        },
+        "required": [
+          "piece_id",
+          "from_location",
+          "to_location"
+        ],
+        "title": "MovePiecePayload",
+        "type": "object"
+      },
+      "OpenNotebookCaptureCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/OpenNotebookCapturePayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "open_notebook_capture",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "OpenNotebookCaptureCommand",
+        "type": "object"
+      },
+      "OpenNotebookCapturePayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "OpenNotebookCapturePayload",
+        "type": "object"
+      },
+      "PauseSessionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/PauseSessionPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "pause_session",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "PauseSessionCommand",
+        "type": "object"
+      },
+      "PauseSessionPayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "PauseSessionPayload",
+        "type": "object"
+      },
+      "ReceiptResponse": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "accepted",
+              "duplicate",
+              "stale"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "receipt_id": {
+            "title": "Receipt Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "outcome"
+        ],
+        "title": "ReceiptResponse",
+        "type": "object"
+      },
+      "RenderReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "connection_generation": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Connection Generation",
+            "type": "integer"
+          },
+          "effect_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Effect Id",
+            "type": "string"
+          },
+          "receipt_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Receipt Id",
+            "type": "string"
+          },
+          "scene_revision": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Scene Revision",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "render_applied",
+              "animation_completed",
+              "settled_by_interruption",
+              "render_failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "receipt_id",
+          "effect_id",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "scene_revision",
+          "connection_generation",
+          "status"
+        ],
+        "title": "RenderReceipt",
+        "type": "object"
+      },
+      "RequestHelpCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RequestHelpPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "request_help",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "RequestHelpCommand",
+        "type": "object"
+      },
+      "RequestHelpPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "prompt",
+              "visual_hint",
+              "worked_step",
+              "alternate_strategy",
+              "virtual_objects",
+              "reference_model"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reason"
+        ],
+        "title": "RequestHelpPayload",
+        "type": "object"
+      },
+      "RequestReconstructionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RequestReconstructionPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "request_reconstruction",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "RequestReconstructionCommand",
+        "type": "object"
+      },
+      "RequestReconstructionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "observation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Observation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_id"
+        ],
+        "title": "RequestReconstructionPayload",
+        "type": "object"
+      },
+      "ResumeSessionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ResumeSessionPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "resume_session",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ResumeSessionCommand",
+        "type": "object"
+      },
+      "ResumeSessionPayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "ResumeSessionPayload",
+        "type": "object"
+      },
+      "RetakeNotebookPhotoCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RetakeNotebookPhotoPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "retake_notebook_photo",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "RetakeNotebookPhotoCommand",
+        "type": "object"
+      },
+      "RetakeNotebookPhotoPayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "RetakeNotebookPhotoPayload",
+        "type": "object"
+      },
+      "RetakeSourcePhotoCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RetakeSourcePhotoPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "retake_source_photo",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "RetakeSourcePhotoCommand",
+        "type": "object"
+      },
+      "RetakeSourcePhotoPayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "RetakeSourcePhotoPayload",
+        "type": "object"
+      },
+      "ReturnToActivityCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ReturnToActivityPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "return_to_activity",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "ReturnToActivityCommand",
+        "type": "object"
+      },
+      "ReturnToActivityPayload": {
+        "additionalProperties": false,
+        "description": "Payload vazio: só `{}` é aceito.",
+        "properties": {},
+        "title": "ReturnToActivityPayload",
+        "type": "object"
+      },
+      "RunDemoStepCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RunDemoStepPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "run_demo_step",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "RunDemoStepCommand",
+        "type": "object"
+      },
+      "RunDemoStepPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "step_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Step Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id"
+        ],
+        "title": "RunDemoStepPayload",
+        "type": "object"
+      },
+      "SceneEffect": {
+        "properties": {
+          "effect_id": {
+            "title": "Effect Id",
+            "type": "string"
+          },
+          "requires_ack": {
+            "const": "render_applied",
+            "title": "Requires Ack",
+            "type": "string"
+          }
+        },
+        "required": [
+          "effect_id",
+          "requires_ack"
+        ],
+        "title": "SceneEffect",
+        "type": "object"
+      },
+      "SetProjectionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SetProjectionPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "set_projection",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "SetProjectionCommand",
+        "type": "object"
+      },
+      "SetProjectionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "projection": {
+            "enum": [
+              "perspective",
+              "top",
+              "schematic"
+            ],
+            "title": "Projection",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projection"
+        ],
+        "title": "SetProjectionPayload",
+        "type": "object"
+      },
+      "SetThinkingCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SetThinkingPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "set_thinking",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "SetThinkingCommand",
+        "type": "object"
+      },
+      "SetThinkingPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "SetThinkingPayload",
+        "type": "object"
+      },
+      "SubmitAnswerCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SubmitAnswerPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "submit_answer",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "SubmitAnswerCommand",
+        "type": "object"
+      },
+      "SubmitAnswerPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "maximum": 9999,
+            "minimum": -9999,
+            "title": "Answer",
+            "type": "integer"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
+          }
+        },
+        "required": [
+          "answer",
+          "explanation"
+        ],
+        "title": "SubmitAnswerPayload",
+        "type": "object"
+      },
+      "SubmitExplanationCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SubmitExplanationPayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "submit_explanation",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "type",
+          "payload"
+        ],
+        "title": "SubmitExplanationCommand",
+        "type": "object"
+      },
+      "SubmitExplanationPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id"
+          },
+          "modality": {
+            "enum": [
+              "text",
+              "voice_transcript",
+              "artifact"
+            ],
+            "title": "Modality",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "required": [
+          "modality"
+        ],
+        "title": "SubmitExplanationPayload",
+        "type": "object"
+      },
+      "UndoMoveCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expected_scene_revision": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "title": "Expected Scene Revision",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/UndoMovePayload"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_epoch": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Epoch"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "type": {
+            "const": "undo_move",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "command_id",
+          "session_id",
+          "attempt_id",
+          "expected_revision",
+          "expected_scene_revision",
+          "type",
+          "payload"
+        ],
+        "title": "UndoMoveCommand",
+        "type": "object"
+      },
+      "UndoMovePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "target_command_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Target Command Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_command_id"
+        ],
+        "title": "UndoMovePayload",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "API de sessão do tutor de divisão (Spec Parte II).",
+    "title": "Prof em Casa",
+    "version": "0.2.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/sessions": {
+      "post": {
+        "operationId": "create_session_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotent-Replay": {
+                "description": "`true` quando a resposta repete o resultado já gravado.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_PAYLOAD"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Cria a sessão (ou devolve a mesma, no replay do request_id)"
+      }
+    },
+    "/v1/sessions/{session_id}": {
+      "get": {
+        "operationId": "get_session_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-controller-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Controller-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Session V1 Sessions  Session Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_PAYLOAD"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "ACTION_NOT_ALLOWED, CONTROL_LOST"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, IDEMPOTENCY_CONFLICT, INVALID_TRANSITION"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PROVIDER_UNAVAILABLE"
+          }
+        },
+        "summary": "Snapshot público da sessão"
+      }
+    },
+    "/v1/sessions/{session_id}/claim-control": {
+      "post": {
+        "operationId": "claim_control_v1_sessions__session_id__claim_control_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-controller-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Controller-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimControlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimControlResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_PAYLOAD"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "ACTION_NOT_ALLOWED, CONTROL_LOST"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, IDEMPOTENCY_CONFLICT, INVALID_TRANSITION"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PROVIDER_UNAVAILABLE"
+          }
+        },
+        "summary": "Assume o controle da sessão neste dispositivo"
+      }
+    },
+    "/v1/sessions/{session_id}/commands": {
+      "post": {
+        "operationId": "post_command_v1_sessions__session_id__commands_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-controller-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Controller-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "apply_help": "#/components/schemas/ApplyHelpCommand",
+                    "cancel_capture": "#/components/schemas/CancelCaptureCommand",
+                    "check_distribution": "#/components/schemas/CheckDistributionCommand",
+                    "choose_reference_activity": "#/components/schemas/ChooseReferenceActivityCommand",
+                    "clarify_observation": "#/components/schemas/ClarifyObservationCommand",
+                    "clarify_source": "#/components/schemas/ClarifySourceCommand",
+                    "close_session": "#/components/schemas/CloseSessionCommand",
+                    "confirm_source": "#/components/schemas/ConfirmSourceCommand",
+                    "continue_after_explanation": "#/components/schemas/ContinueAfterExplanationCommand",
+                    "dispute_observation": "#/components/schemas/DisputeObservationCommand",
+                    "enter_notebook": "#/components/schemas/EnterNotebookCommand",
+                    "finish_demonstration": "#/components/schemas/FinishDemonstrationCommand",
+                    "highlight_available": "#/components/schemas/HighlightAvailableCommand",
+                    "highlight_group": "#/components/schemas/HighlightGroupCommand",
+                    "interrupt_turn": "#/components/schemas/InterruptTurnCommand",
+                    "move_piece": "#/components/schemas/MovePieceCommand",
+                    "open_notebook_capture": "#/components/schemas/OpenNotebookCaptureCommand",
+                    "pause_session": "#/components/schemas/PauseSessionCommand",
+                    "request_help": "#/components/schemas/RequestHelpCommand",
+                    "request_reconstruction": "#/components/schemas/RequestReconstructionCommand",
+                    "resume_session": "#/components/schemas/ResumeSessionCommand",
+                    "retake_notebook_photo": "#/components/schemas/RetakeNotebookPhotoCommand",
+                    "retake_source_photo": "#/components/schemas/RetakeSourcePhotoCommand",
+                    "return_to_activity": "#/components/schemas/ReturnToActivityCommand",
+                    "run_demo_step": "#/components/schemas/RunDemoStepCommand",
+                    "set_projection": "#/components/schemas/SetProjectionCommand",
+                    "set_thinking": "#/components/schemas/SetThinkingCommand",
+                    "submit_answer": "#/components/schemas/SubmitAnswerCommand",
+                    "submit_explanation": "#/components/schemas/SubmitExplanationCommand",
+                    "undo_move": "#/components/schemas/UndoMoveCommand"
+                  },
+                  "propertyName": "type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ConfirmSourceCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ClarifySourceCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RetakeSourcePhotoCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ChooseReferenceActivityCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RunDemoStepCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FinishDemonstrationCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MovePieceCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UndoMoveCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CheckDistributionCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/HighlightGroupCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/HighlightAvailableCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SetProjectionCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RequestHelpCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ApplyHelpCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EnterNotebookCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenNotebookCaptureCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReturnToActivityCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CancelCaptureCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RetakeNotebookPhotoCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RequestReconstructionCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DisputeObservationCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ClarifyObservationCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SubmitAnswerCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SubmitExplanationCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ContinueAfterExplanationCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SetThinkingCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PauseSessionCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ResumeSessionCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/InterruptTurnCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CloseSessionCommand"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandAccepted"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotent-Replay": {
+                "description": "`true` quando a resposta repete o resultado já gravado.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_PAYLOAD"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "ACTION_NOT_ALLOWED, CONTROL_LOST"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, IDEMPOTENCY_CONFLICT, INVALID_TRANSITION"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PROVIDER_UNAVAILABLE"
+          }
+        },
+        "summary": "Executa um comando (idempotente por command_id)"
+      }
+    },
+    "/v1/sessions/{session_id}/events": {
+      "get": {
+        "operationId": "list_events_v1_sessions__session_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 2147483647,
+              "minimum": 0,
+              "title": "After Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-controller-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Controller-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_PAYLOAD"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "ACTION_NOT_ALLOWED, CONTROL_LOST"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, IDEMPOTENCY_CONFLICT, INVALID_TRANSITION"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PROVIDER_UNAVAILABLE"
+          }
+        },
+        "summary": "Eventos com event_seq > after_seq, na projeção do ator"
+      }
+    },
+    "/v1/sessions/{session_id}/render-receipts": {
+      "post": {
+        "operationId": "post_render_receipt_v1_sessions__session_id__render_receipts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-controller-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Controller-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderReceipt"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_PAYLOAD"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "ACTION_NOT_ALLOWED, CONTROL_LOST"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, IDEMPOTENCY_CONFLICT, INVALID_TRANSITION"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "PROVIDER_UNAVAILABLE"
+          }
+        },
+        "summary": "ACK de render (não muda a revisão)"
+      }
+    }
+  }
+}

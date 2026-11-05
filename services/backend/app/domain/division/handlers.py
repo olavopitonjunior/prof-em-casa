@@ -1,4 +1,5 @@
-"""Handlers dos comandos executáveis no incremento 1 (regra (6) da ordem de guardas).
+"""Handlers dos comandos executáveis (regra (6) da ordem de guardas): incremento 1 mais o fluxo
+de captura do caderno.
 
 Cada handler recebe um `Ctx` e devolve um `Outcome`: o novo estado SEM fase, revisões nem
 `last_event_seq` (o `apply_command` completa isso), os eventos e se a cena mudou. Handlers nunca
@@ -21,7 +22,7 @@ from app.domain.division.demonstration import apply_demo_step, completed_rounds,
 from app.domain.division.distribution import select_initial_intervention, verify_distribution
 from app.domain.division.errors import DomainError
 from app.domain.division.scene import SceneState, initial_scene, move_piece
-from app.domain.division.state import Attempt, DomainEvent, SessionState
+from app.domain.division.state import Attempt, DomainEvent, SessionState, drop_artifact
 from app.domain.division.transitions import AttemptKind, NextPhaseFacts, next_phase
 
 
@@ -97,7 +98,9 @@ def _outcome_event(content: ContentPackage, attempt: Attempt, *, final: bool) ->
 def _evaluate(ctx: Ctx, attempt: Attempt, modality: str, text: str) -> ExplanationResult:
     raw = ctx.evaluator.evaluate(attempt.item_id, text)
     # A modalidade é a do comando (a nota vem do avaliador).
-    return ExplanationResult(rating=raw.rating, modality=modality, evidence=raw.evidence)  # type: ignore[arg-type]
+    # R27: a nota e a modalidade são estruturadas; o `evidence` livre do avaliador é descartado aqui,
+    # antes de ir para o estado (e daí para o banco) ou para um evento.
+    return ExplanationResult(rating=raw.rating, modality=modality)  # type: ignore[arg-type]
 
 
 def _explanation_event(attempt: Attempt, result: ExplanationResult) -> DomainEvent:
@@ -106,7 +109,6 @@ def _explanation_event(attempt: Attempt, result: ExplanationResult) -> DomainEve
         attempt.attempt_id,
         rating=result.rating,
         modality=result.modality,
-        evidence=result.evidence,
     )
 
 
@@ -268,13 +270,13 @@ def request_help(ctx: Ctx) -> Outcome:
         # D4: só existe roteiro 20+4 para o item 24÷4.
         raise DomainError("UNSUPPORTED_CONTENT", "alternate_strategy has no script for this item")
     # A assistência é gravada antes de qualquer recurso ser liberado (Parte I §7).
-    attempt = attempt.with_changes(ledger=apply_help_effect(attempt.ledger, p.kind, p.reason))
+    attempt = attempt.with_changes(ledger=apply_help_effect(attempt.ledger, p.kind))
     events = [
         _event(
             "help_granted",
             attempt.attempt_id,
             kind=p.kind,
-            reason=p.reason,
+            has_reason=bool(p.reason),  # o texto da criança não vira evento (R28, AC-45)
             **_help_snapshot(attempt),
         )
     ]
@@ -303,11 +305,7 @@ def enter_notebook(ctx: Ctx) -> Outcome:
     if intent == "try_on_paper":  # papel é recurso de apoio, não ajuda: o nível não sobe
         attempt = _active(s)
         ledger = attempt.ledger
-        paper = AssistanceLedger(
-            level=ledger.level,
-            resources=ledger.resources | {"paper"},
-            reasons=ledger.reasons,
-        )
+        paper = AssistanceLedger(level=ledger.level, resources=ledger.resources | {"paper"})
         updated = _with_attempt(updated, attempt.with_changes(ledger=paper))
     event = _event(
         "notebook_entered", s.active_attempt_id, intent=intent, return_phase=return_phase
@@ -321,6 +319,25 @@ def return_to_activity(ctx: Ctx) -> Outcome:
     updated = s.with_changes(interaction_mode="ready", return_phase=None, notebook_intent=None)
     event = _event("returned_to_activity", s.active_attempt_id, from_phase=s.phase, to_phase=target)
     return Outcome(updated, [event])
+
+
+def open_notebook_capture(ctx: Ctx) -> Outcome:
+    """notebook -> notebook_capture (a fase vem da tabela). Uma foto nova (R23) abandona o artefato
+    anterior, que pode existir depois de `revise_record`."""
+    updated, events = drop_artifact(ctx.session, reason="recapture", clear_completed=True)
+    return Outcome(updated, events)
+
+
+def cancel_capture(ctx: Ctx) -> Outcome:
+    """notebook_capture -> notebook. Mantém o checkpoint; em captura não há artefato vigente."""
+    return Outcome(ctx.session)
+
+
+def retake_notebook_photo(ctx: Ctx) -> Outcome:
+    """notebook_review -> notebook_capture. A foto descartada deixa de valer (R26: um evento só se
+    a análise ainda estava pendente)."""
+    updated, events = drop_artifact(ctx.session, reason="retake", clear_completed=True)
+    return Outcome(updated, events)
 
 
 def submit_answer(ctx: Ctx) -> Outcome:
@@ -364,7 +381,12 @@ def continue_after_explanation(ctx: Ctx) -> Outcome:
         interaction_mode="ready", return_phase=None, notebook_intent=None
     )
     if attempt.kind != "guided":
-        return Outcome(updated, events)
+        # Análise ainda pendente não terá mais onde ser aplicada; a já concluída fica como evidência.
+        updated, dropped = drop_artifact(updated, reason="attempt_closed", clear_completed=False)
+        return Outcome(updated, [*events, *dropped])
+    # A foto do caderno pertence à tentativa guiada: não passa para a questão nova.
+    updated, dropped = drop_artifact(updated, reason="attempt_changed", clear_completed=True)
+    events += dropped
     transfer, _ = _start_attempt(s, "transfer", _item_by_role(ctx.content, "transfer"))
     updated = updated.with_changes(
         attempts=(*updated.attempts, transfer), active_attempt_id=transfer.attempt_id, scene=None
@@ -408,6 +430,9 @@ def close_session(ctx: Ctx) -> Outcome:
             events.append(_outcome_event(ctx.content, attempt, final=True))
         updated = _with_attempt(s, attempt.with_changes(status="closed"))
     completion = "complete" if reason == "completed" else "partial"
+    # A análise pendente não terá mais onde ser aplicada (o resultado será descartado).
+    updated, dropped = drop_artifact(updated, reason="session_closed", clear_completed=False)
+    events += dropped
     updated = updated.with_changes(
         session_status="closed",
         completion=completion,
@@ -430,6 +455,9 @@ HANDLERS: dict[str, Callable[[Ctx], Outcome]] = {
     "request_help": request_help,
     "enter_notebook": enter_notebook,
     "return_to_activity": return_to_activity,
+    "open_notebook_capture": open_notebook_capture,
+    "cancel_capture": cancel_capture,
+    "retake_notebook_photo": retake_notebook_photo,
     "submit_answer": submit_answer,
     "submit_explanation": submit_explanation,
     "continue_after_explanation": continue_after_explanation,

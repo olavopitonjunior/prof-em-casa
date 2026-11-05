@@ -152,6 +152,36 @@ def test_run_demo_step_by_tutor_emits_events():
     assert r.events[0].data["round_completed"] is True
 
 
+# --- R30: turno antigo do tutor não causa efeito -----------------------------------------------
+
+
+def test_tutor_command_with_stale_turn_epoch_is_rejected():
+    s = session_after_demo_steps(3).with_changes(turn_epoch=2)
+    for old in (0, 1, 3):
+        e = _code(s, cmd("run_demo_step", actor="tutor", step_id="r1-g4", turn_epoch=old))
+        assert e.code == "STALE_TURN" and "2" in (e.detail or "")
+    ok = apply(s, cmd("run_demo_step", actor="tutor", step_id="r1-g4", turn_epoch=2))
+    assert ok.session.revision == s.revision + 1
+
+
+def test_stale_turn_is_checked_before_any_other_rule():
+    s = session_after_demo_steps(3).with_changes(turn_epoch=2)
+    # revisão velha também: a recusa de turno vem antes e não revela nada do resto
+    stale_both = cmd(
+        "run_demo_step", actor="tutor", step_id="r1-g4", turn_epoch=1, expected_revision=0
+    )
+    assert _code(s, stale_both).code == "STALE_TURN"
+
+
+def test_stale_turn_rule_does_not_touch_learner_or_system_commands():
+    s = session_after_demo_steps(3).with_changes(turn_epoch=5)
+    assert apply(s, cmd("run_demo_step", actor="system", step_id="r1-g4")).session.revision == (
+        s.revision + 1
+    )
+    p = session_in_practice().with_changes(turn_epoch=5)
+    assert apply(p, cmd("check_distribution")).session.revision == p.revision + 1
+
+
 # --- AC-05 / AC-06 ----------------------------------------------------------------------------
 
 
@@ -489,8 +519,18 @@ def test_conceptual_help_raises_the_ledger_and_never_lowers_it():
     s = run(s, cmd("request_help", kind="worked_step", reason="não sei"))
     s = run(s, cmd("request_help", kind="prompt", reason="outra"))
     ledger = attempt(s, "guided").ledger
-    assert ledger.level == "demonstrated" and len(ledger.reasons) == 2
+    assert ledger.level == "demonstrated"
     assert public_snapshot(s, CONTENT)["attempt"]["assistance_level"] == "demonstrated"
+
+
+def test_help_reason_text_is_not_kept_in_state_or_events():
+    """R28 / AC-45: o texto livre da criança não fica no estado nem no evento; só `has_reason`."""
+    secret = "Maria Silva 123"
+    r = apply(session_in_practice(), cmd("request_help", kind="prompt", reason=secret))
+    assert secret not in r.session.model_dump_json()
+    granted = [e for e in r.events if e.type == "help_granted"]
+    assert len(granted) == 1 and granted[0].data["has_reason"] is True
+    assert secret not in repr([e.data for e in r.events])
 
 
 def test_alternate_strategy_is_allowed_in_the_guided_item():
@@ -502,7 +542,6 @@ def test_try_on_paper_adds_the_paper_resource_without_raising_the_level():
     n = run(session_in_practice(), cmd("enter_notebook", intent="try_on_paper"))
     ledger = attempt(n, "guided").ledger
     assert ledger.resources == frozenset({"paper"}) and ledger.level == "none"
-    assert ledger.reasons == ()
     again = run(run(n, cmd("return_to_activity")), cmd("enter_notebook", intent="try_on_paper"))
     assert attempt(again, "guided").ledger == ledger  # idempotente
 
@@ -710,3 +749,23 @@ def test_snapshot_never_shows_an_answer_outside_the_demonstration():
         scene=s.scene.__class__.model_validate({**dict(s.scene), "answer_display": 6})
     )
     assert public_snapshot(leaky, CONTENT)["scene"]["answer_display"] is None
+
+
+# --- increment 2, Task 2: session_id (P12) e snapshot da análise ------------------------------
+
+
+def test_session_id_mismatch_rejected():
+    e = _code(session_in_practice(), cmd("check_distribution", session_id="other"))
+    assert e.code == "INVALID_PAYLOAD" and e.detail == "session_id mismatch"
+
+
+def test_session_id_mismatch_is_checked_before_session_state_guards():
+    closed = run(session_in_practice(), cmd("close_session"))
+    assert _code(closed, cmd("check_distribution", session_id="other")).code == "INVALID_PAYLOAD"
+    # ... mas depois da autorização do ator.
+    tutor_move = cmd("move_piece", actor="tutor", session_id="other")
+    assert _code(session_in_practice(), tutor_move, as_actor="tutor").code == "ACTION_NOT_ALLOWED"
+
+
+def test_snapshot_analysis_is_null_before_any_photo():
+    assert public_snapshot(session_in_practice(), CONTENT)["analysis"] is None

@@ -3,7 +3,8 @@
 `TRANSITIONS[tipo] = (fases permitidas, próxima fase)`. `None` mantém a fase atual, exceto nos
 quatro comandos cuja próxima fase depende do resultado: neles o segundo elemento é `None` e a regra
 em `_NEXT_PHASE_RULES` decide. A tabela cobre os 30 comandos do catálogo, inclusive os que ainda
-não têm handler (o `apply_command` os recusa com `not_in_increment_1`).
+não têm handler (o `apply_command` os recusa com `not_in_increment_1`). O incremento 2 deu handler
+a `open_notebook_capture`, `cancel_capture` e `retake_notebook_photo`.
 
 Arestas que a Spec Parte I §4 não escreve (D7), todas sujeitas a atualização da Spec:
 - request_reconstruction: notebook_review -> correction

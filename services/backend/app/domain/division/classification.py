@@ -31,7 +31,9 @@ class ExplanationResult(BaseModel):
 
     rating: Literal["sufficient", "partial", "unclear"]
     modality: Literal["text", "voice_transcript", "artifact"]
-    evidence: str
+    # Texto livre do avaliador: pode citar a fala da criança (R27, AC-45). O domínio nunca o
+    # guarda nem o emite em evento; só o avaliador de artefato (montado de `facts`) o preenche.
+    evidence: str | None = None
 
 
 class ExplanationEvaluator(Protocol):

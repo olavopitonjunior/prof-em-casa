@@ -1,13 +1,13 @@
-"""Rastreabilidade AC x teste (Spec Parte III §1; plano, Task 9).
+"""Rastreabilidade AC x teste (Spec Parte III §1).
 
-Cada critério de aceite do incremento 1 precisa de pelo menos um teste marcado com
+Cada critério de aceite dos incrementos 1 e 2 (`REQUIRED_ACS`) precisa de pelo menos um teste marcado com
 `@pytest.mark.ac("AC-xx")` que tenha PASSADO nesta execução. Se faltar algum, a sessão termina
 com falha e lista os ids.
 
 Quando o hook vale: só em execução completa. Isto é, sem `-k`, `--deselect`, `--lf`, `--sw`,
 `--co`, sem arquivo/diretório/nodeid diferente de `testpaths` e com `-m` vazio ou exatamente
 `-m ac`. Assim `pytest tests/domain/test_scene.py` ou `pytest -k algo` não quebram por AC
-alheio, e `pytest -m ac` (o comando de evidência) continua exigindo os dez.
+alheio, e `pytest -m ac` (o comando de evidência) continua exigindo todos.
 """
 
 from pathlib import Path
@@ -17,6 +17,10 @@ import pytest
 INCREMENT_1_ACS = frozenset(
     {"AC-03", "AC-04", "AC-05", "AC-06", "AC-21", "AC-22", "AC-23", "AC-24", "AC-27", "AC-39"}
 )
+
+# AC-27 está nos dois: o incremento 2 fecha o `IDEMPOTENCY_CONFLICT`. A união tem 16 ids.
+INCREMENT_2_ACS = frozenset({"AC-26", "AC-27", "AC-33", "AC-36", "AC-37", "AC-38", "AC-40"})
+REQUIRED_ACS = INCREMENT_1_ACS | INCREMENT_2_ACS
 
 
 def _ids_of(item: pytest.Item) -> frozenset[str]:
@@ -59,7 +63,7 @@ class ACTraceability:
         covered: set[str] = set()
         for nodeid in self.passed:
             covered |= self.marked.get(nodeid, frozenset())
-        return sorted(INCREMENT_1_ACS - covered)
+        return sorted(REQUIRED_ACS - covered)
 
     def _enforced(self, exitstatus) -> bool:
         ok = exitstatus in (pytest.ExitCode.OK, pytest.ExitCode.TESTS_FAILED)

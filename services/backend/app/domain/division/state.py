@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from app.domain.division.assistance import AssistanceLedger
 from app.domain.division.classification import ExplanationResult
+from app.domain.division.observation import NotebookObservation, Verification
 from app.domain.division.scene import SceneState
 from app.domain.division.transitions import AttemptKind, Phase
 
@@ -52,6 +53,14 @@ class _Frozen(BaseModel):
         return type(self).model_validate({**dict(self), **changes})
 
 
+class ActiveArtifact(_Frozen):
+    """Foto do caderno em análise: só a última enviada vale (AC-33)."""
+
+    artifact_id: str
+    artifact_version: StrictInt = Field(ge=1)
+    job_id: str
+
+
 class Attempt(_Frozen):
     attempt_id: str
     kind: AttemptKind
@@ -80,6 +89,10 @@ class SessionState(_Frozen):
     return_phase: Phase | None = None
     notebook_intent: NotebookIntent | None = None
     completion: Completion | None = None
+    # Captura do caderno (AC-33): artefato vigente e o resultado da análise já aplicado.
+    active_artifact: ActiveArtifact | None = None
+    observation: NotebookObservation | None = None
+    verification: Verification | None = None
 
     @model_validator(mode="after")
     def _check_invariants(self) -> "SessionState":
@@ -92,6 +105,16 @@ class SessionState(_Frozen):
             raise ValueError("at most one active attempt")
         if self.scene is not None and self.scene.scene_revision > self.scene_revision:
             raise ValueError("scene is newer than the session scene_revision")
+        if self.observation is not None and self.active_artifact is None:
+            raise ValueError("observation requires an active artifact")
+        if (self.verification is None) != (self.observation is None):
+            raise ValueError("observation and verification come together")
+        if (
+            self.verification is not None
+            and self.observation is not None
+            and self.verification.observation_id != self.observation.observation_id
+        ):
+            raise ValueError("verification is of another observation")
         return self
 
     @property
@@ -129,3 +152,31 @@ def new_session(session_id: str) -> SessionState:
         scene=None,
         last_event_seq=0,
     )
+
+
+def drop_artifact(
+    session: SessionState, *, reason: str, clear_completed: bool
+) -> tuple[SessionState, list[DomainEvent]]:
+    """Abandona o artefato vigente (R23/R26). Se a análise ainda está pendente, emite exatamente um
+    `analysis_superseded`; se já terminou, não há evento. `clear_completed=False` preserva a
+    observação já aplicada (a evidência continua valendo)."""
+    artifact = session.active_artifact
+    if artifact is None:
+        return session, []
+    pending = session.observation is None
+    events: list[DomainEvent] = []
+    if pending:
+        events.append(
+            DomainEvent(
+                type="analysis_superseded",
+                attempt_id=session.active_attempt_id,
+                data={
+                    "artifact_id": artifact.artifact_id,
+                    "job_id": artifact.job_id,
+                    "reason": reason,
+                },
+            )
+        )
+    if not (pending or clear_completed):
+        return session, events
+    return session.with_changes(active_artifact=None, observation=None, verification=None), events

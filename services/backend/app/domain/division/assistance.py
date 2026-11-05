@@ -41,11 +41,10 @@ class AssistanceLedger(BaseModel):
 
     level: AssistanceLevel = "none"
     resources: frozenset[SupportResource] = frozenset()
-    reasons: tuple[str, ...] = ()
 
 
-def apply_help_effect(ledger: AssistanceLedger, kind: HelpKind, reason: str) -> AssistanceLedger:
-    """Devolve um novo registro. Todo motivo é anexado, inclusive de procedural e accessibility."""
+def apply_help_effect(ledger: AssistanceLedger, kind: HelpKind) -> AssistanceLedger:
+    """Devolve um novo registro. O texto livre da criança nunca entra aqui (R28, AC-45)."""
     level = ledger.level
     target = _LEVEL_OF_KIND.get(kind)
     if target is not None and _RANK[target] > _RANK[level]:
@@ -54,4 +53,4 @@ def apply_help_effect(ledger: AssistanceLedger, kind: HelpKind, reason: str) -> 
     resource = _RESOURCE_OF_KIND.get(kind)
     if resource is not None:
         resources = resources | {resource}
-    return AssistanceLedger(level=level, resources=resources, reasons=(*ledger.reasons, reason))
+    return AssistanceLedger(level=level, resources=resources)
