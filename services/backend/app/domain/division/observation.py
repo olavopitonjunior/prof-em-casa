@@ -23,8 +23,9 @@ from app.domain.division.errors import DomainError
 from app.domain.division.scene import Group, Piece, SceneState
 from app.domain.division.task import TaskSpec
 
-_EPS = 1e-9
+_EPS = 1e-9  # tolerância de ponto flutuante: 0.1 + 0.9 não pode ser sinalizado como > 1
 _COUNT_PATH = re.compile(r"^/groups/(0|[1-9][0-9]*)/count$")
+_UNDER_GROUP = re.compile(r"^/groups/(0|[1-9][0-9]*)(/.*)?$")
 _GROUP_PATH = re.compile(r"^/groups/(0|[1-9][0-9]*)(/count|/bbox)?$")
 _EXPRESSION_PATHS = {
     "/expression",
@@ -174,11 +175,21 @@ def _path_exists(obs: NotebookObservation, path: str) -> bool:
 class _Counts:
     values: tuple[int | None, ...]  # contagem efetiva por grupo; None = inutilizável
     learner_reported: tuple[int, ...]  # índices vindos de clarificação
-    resolved_paths: frozenset[str]
+    resolved_groups: frozenset[int]  # grupos resolvidos por clarificação de /groups/{i}/count
+
+
+def _ambiguous_group_indexes(obs: NotebookObservation) -> set[int]:
+    """Grupos com ambiguidade em /groups/{i} ou em qualquer caminho abaixo dele."""
+    found: set[int] = set()
+    for a in obs.ambiguities:
+        m = _UNDER_GROUP.match(a.field_path)
+        if m is not None:
+            found.add(int(m.group(1)))
+    return found
 
 
 def _resolve_counts(obs: NotebookObservation, clarifications: list[Clarification]) -> _Counts:
-    ambiguous_paths = {a.field_path for a in obs.ambiguities}
+    ambiguous = _ambiguous_group_indexes(obs)
     given: dict[int, int] = {}
     for c in clarifications:
         m = _COUNT_PATH.match(c.field_path)
@@ -186,7 +197,7 @@ def _resolve_counts(obs: NotebookObservation, clarifications: list[Clarification
             raise DomainError("INVALID_PAYLOAD", f"clarification for unknown path {c.field_path}")
         i = int(m.group(1))
         g = obs.groups[i]
-        if not (g.count is None or g.uncertain or c.field_path in ambiguous_paths):
+        if not (g.count is None or g.uncertain or i in ambiguous):
             raise DomainError("INVALID_PAYLOAD", f"{c.field_path} is not ambiguous")
         if i in given:
             raise DomainError("INVALID_PAYLOAD", f"duplicate clarification for {c.field_path}")
@@ -195,23 +206,37 @@ def _resolve_counts(obs: NotebookObservation, clarifications: list[Clarification
     for i, g in enumerate(obs.groups):
         if i in given:
             values.append(given[i])
-        elif g.count is None or g.uncertain or f"/groups/{i}/count" in ambiguous_paths:
+        elif g.count is None or g.uncertain or i in ambiguous:
             values.append(None)
         else:
             values.append(g.count)
     return _Counts(
         values=tuple(values),
         learner_reported=tuple(sorted(given)),
-        resolved_paths=frozenset(f"/groups/{i}/count" for i in given),
+        resolved_groups=frozenset(given),
     )
 
 
-def _reconstruction_blocker(task: TaskSpec, counts: _Counts) -> str | None:
+def _unresolved_ambiguities(obs: NotebookObservation, counts: _Counts) -> list[Ambiguity]:
+    def resolved(path: str) -> bool:
+        m = _UNDER_GROUP.match(path)
+        return m is not None and int(m.group(1)) in counts.resolved_groups
+
+    return [a for a in obs.ambiguities if not resolved(a.field_path)]
+
+
+def _reconstruction_blocker(
+    task: TaskSpec, obs: NotebookObservation, counts: _Counts
+) -> str | None:
     values = counts.values
     if not values:
         return "NO_GROUPS"
+    if validate_observation(obs):
+        return "INVALID_OBSERVATION"
     if any(v is None for v in values):
         return "UNUSABLE_COUNTS"
+    if obs.status == "needs_clarification" and _unresolved_ambiguities(obs, counts):
+        return "UNRESOLVED_AMBIGUITY"  # mesma condição que torna a verificação inconclusiva
     if len(values) != task.divisor:
         return "GROUP_COUNT_MISMATCH"
     if sum(v for v in values if v is not None) > task.dividend:
@@ -280,7 +305,7 @@ def verify_observation(
                 obs.groups[i].group_id for i in counts.learner_reported
             ]
 
-    unresolved = [a for a in obs.ambiguities if a.field_path not in counts.resolved_paths]
+    unresolved = _unresolved_ambiguities(obs, counts)
     if values:
         inconclusive = not all_usable
     else:  # só expressão: sem evidência de grupos, decide pela expressão e pela resposta escrita
@@ -299,7 +324,7 @@ def verify_observation(
         status=status,
         facts=facts,
         issues=tuple(i for i in _ISSUE_ORDER if i in issues),
-        reconstruction_allowed=_reconstruction_blocker(task, counts) is None,
+        reconstruction_allowed=_reconstruction_blocker(task, obs, counts) is None,
     )
 
 
@@ -314,7 +339,7 @@ def build_reconstruction(
 ) -> SceneState | ReconstructionUnavailable:
     """Monta a cena a partir da foto. photo groups[i] vira group-{i+1}; faltantes são task_derived."""
     counts = _resolve_counts(obs, clarifications)
-    blocker = _reconstruction_blocker(task, counts)
+    blocker = _reconstruction_blocker(task, obs, counts)
     if blocker is not None:
         return ReconstructionUnavailable(reason=blocker)
 

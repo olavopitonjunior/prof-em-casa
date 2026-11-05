@@ -274,3 +274,73 @@ def test_expression_only_without_written_answer_is_inconclusive():
     raw["expression"]["dividend"] = 20
     v = verify_observation(T24_4, 6, NotebookObservation.model_validate(raw), [])
     assert v.status == "inconsistent" and v.issues == ("EXPRESSION_MISMATCH",)
+
+
+@pytest.mark.parametrize("path", ["/groups/2", "/groups/2/bbox"])
+@pytest.mark.parametrize("status", ["usable", "needs_clarification"])
+def test_group_level_ambiguity_makes_count_unusable(path, status):
+    raw = load_raw("observacao-5-5-5-5")
+    raw["status"] = status
+    raw["ambiguities"] = [{"field_path": path, "reason": "overlap"}]
+    obs = NotebookObservation.model_validate(raw)
+    v = verify_observation(T24_4, 6, obs, [])
+    assert v.status == "inconclusive" and v.reconstruction_allowed is False
+    for key in ("represented_total", "not_represented", "groups_equal", "excess_represented"):
+        assert key not in v.facts
+    assert v.facts["observed_group_counts"] == [5, 5, None, 5]
+    assert isinstance(build_reconstruction(T24_4, obs, [], **ids), ReconstructionUnavailable)
+
+
+@pytest.mark.parametrize("path", ["/groups/2", "/groups/2/bbox"])
+def test_group_level_ambiguity_resolved_by_count_clarification(path):
+    raw = load_raw("observacao-5-5-5-5")
+    raw["ambiguities"] = [{"field_path": path, "reason": "overlap"}]
+    obs = NotebookObservation.model_validate(raw)
+    c = [Clarification(field_path="/groups/2/count", value=5)]
+    v = verify_observation(T24_4, 6, obs, c)
+    assert v.status == "inconsistent" and v.reconstruction_allowed
+    assert v.facts["learner_reported_groups"] == ["photo-group-3"]
+    assert isinstance(build_reconstruction(T24_4, obs, c, **ids), SceneState)
+
+
+def test_reconstruction_never_allowed_when_inconclusive():
+    cases = []
+    for name in ("observacao-5-5-5-5", "observacao-ambigua", "observacao-corrigida"):
+        for status in ("usable", "needs_clarification"):
+            for amb in ([], ["/groups/1"], ["/groups/3/bbox"], ["/expression/answer"]):
+                raw = load_raw(name)
+                raw["status"] = status
+                if amb:
+                    raw["ambiguities"] = [{"field_path": p, "reason": "missing"} for p in amb]
+                elif status == "needs_clarification" and not raw["ambiguities"]:
+                    continue
+                cases.append(raw)
+    assert len(cases) > 10
+    for raw in cases:
+        obs = NotebookObservation.model_validate(raw)
+        for c in ([], [Clarification(field_path="/groups/2/count", value=5)]):
+            try:
+                v = verify_observation(T24_4, 6, obs, c)
+            except DomainError:
+                continue
+            assert not (v.status == "inconclusive" and v.reconstruction_allowed)
+            built = build_reconstruction(T24_4, obs, c, **ids)
+            assert isinstance(built, SceneState) == v.reconstruction_allowed
+
+
+def test_reconstruction_refused_when_observation_fails_extra_checks():
+    raw = load_raw("observacao-5-5-5-5")
+    raw["groups"][1]["group_id"] = "photo-group-1"  # observation_ref duplicado
+    obs = NotebookObservation.model_validate(raw)
+    assert validate_observation(obs) == ["DUPLICATE_GROUP_ID"]
+    r = build_reconstruction(T24_4, obs, [], **ids)
+    assert isinstance(r, ReconstructionUnavailable)
+    assert verify_observation(T24_4, 6, obs, []).reconstruction_allowed is False
+
+
+def test_bbox_tolerance():
+    raw = load_raw("observacao-5-5-5-5")
+    raw["groups"][0]["bbox"].update(x=0.1, width=0.9)  # 0.1 + 0.9 não pode dar falso positivo
+    assert validate_observation(NotebookObservation.model_validate(raw)) == []
+    raw["groups"][0]["bbox"].update(x=0.5, width=0.5000001)
+    assert validate_observation(NotebookObservation.model_validate(raw)) == ["BBOX_OUT_OF_BOUNDS"]
