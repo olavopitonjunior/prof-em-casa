@@ -11,14 +11,19 @@ import os
 import shutil
 import socket
 import subprocess
+import threading
 import uuid
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from app.content.loader import load_content
 from app.db.engine import create_schema, make_engine
+from app.sessions.service import SessionService
+from helpers import StubEvaluator
 from sqlalchemy import Engine, text
 
 TEMPLATE_DB = "template_tutor"
@@ -181,3 +186,63 @@ def engine(db_url: str) -> Iterator[Engine]:
         yield eng
     finally:
         eng.dispose()
+
+
+# --- Serviço de sessão (Task 4 em diante) -------------------------------------------------------
+
+T0 = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+TOKEN_SECRET = b"test-token-secret"
+
+
+class FakeClock:
+    """Relógio fixo e mutável: `advance` move o tempo sem dormir."""
+
+    def __init__(self, now: datetime = T0) -> None:
+        self.now = now
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, delta: timedelta) -> None:
+        self.now += delta
+
+
+class SeqIds:
+    """Ids sequenciais e determinísticos (`ses_0001`, `evt_0002`...), seguros entre threads."""
+
+    def __init__(self) -> None:
+        self._n = 0
+        self._lock = threading.Lock()
+
+    def __call__(self, prefix: str) -> str:
+        with self._lock:
+            self._n += 1
+            return f"{prefix}_{self._n:04d}"
+
+
+@pytest.fixture
+def clock() -> FakeClock:
+    return FakeClock()
+
+
+@pytest.fixture
+def make_service(clock: FakeClock) -> Callable[..., SessionService]:
+    """Fábrica de serviços sobre um engine dado: `make_service(engine, evaluator=...)`."""
+    ids = SeqIds()
+
+    def build(engine: Engine, **overrides) -> SessionService:
+        options = {
+            "token_secret": TOKEN_SECRET,
+            "clock": clock,
+            "ids": ids,
+            **overrides,
+        }
+        evaluator = options.pop("evaluator", None) or StubEvaluator()
+        return SessionService(engine, load_content(), evaluator, **options)
+
+    return build
+
+
+@pytest.fixture
+def svc(engine: Engine, make_service: Callable[..., SessionService]) -> SessionService:
+    return make_service(engine)

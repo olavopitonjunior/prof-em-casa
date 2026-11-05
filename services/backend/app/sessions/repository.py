@@ -1,0 +1,312 @@
+"""Leitura e escrita da sessão em SQLAlchemy Core. Toda função recebe uma `Connection`: a
+transação é de quem chama (o `SessionService`), nunca daqui.
+
+`sessions.state` é a fonte da verdade (decisão P1); `session_events` é o log durável e `attempts`
+é um modelo de leitura derivado do estado. Eventos e resultados guardam exatamente o que o
+domínio devolveu.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import Connection, insert, select, update
+
+from app.db.schema import (
+    attempts,
+    command_results,
+    session_credentials,
+    session_events,
+    sessions,
+)
+from app.domain.division.state import DomainEvent, SessionState
+from app.sessions.errors import SessionError
+from app.sessions.projection import EventRecord
+
+
+@dataclass(frozen=True)
+class SessionRow:
+    state: SessionState
+    connection_generation: int
+    controller_id: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True)
+class StoredResult:
+    kind: str
+    body_hash: str
+    actor: str
+    principal_id: str
+    http_status: int
+    response: dict[str, Any]
+    revision: int
+
+
+def _summary_columns(state: SessionState) -> dict[str, Any]:
+    """Colunas denormalizadas de `sessions`: o que as consultas precisam sem abrir o JSON."""
+    return {
+        "state": state.model_dump(mode="json"),
+        "revision": state.revision,
+        "scene_revision": state.scene_revision,
+        "phase": state.phase,
+        "session_status": state.session_status,
+        "turn_epoch": state.turn_epoch,
+        "last_event_seq": state.last_event_seq,
+        "active_attempt_id": state.active_attempt_id,
+    }
+
+
+# --- sessão -------------------------------------------------------------------------------------
+
+
+def load_session(conn: Connection, session_id: str, *, for_update: bool) -> SessionRow | None:
+    """`for_update` trava a linha até o fim da transação (Postgres). No SQLite o `BEGIN IMMEDIATE`
+    do engine já serializa os escritores, e a cláusula não existe."""
+    query = select(
+        sessions.c.state,
+        sessions.c.connection_generation,
+        sessions.c.controller_id,
+        sessions.c.expires_at,
+    ).where(sessions.c.session_id == session_id)
+    if for_update and conn.dialect.name == "postgresql":
+        query = query.with_for_update()
+    found = conn.execute(query).one_or_none()
+    if found is None:
+        return None
+    return SessionRow(
+        state=SessionState.model_validate(found.state),
+        connection_generation=found.connection_generation,
+        controller_id=found.controller_id,
+        expires_at=found.expires_at,
+    )
+
+
+def find_session_id_by_request(conn: Connection, create_request_id: str) -> str | None:
+    return conn.execute(
+        select(sessions.c.session_id).where(sessions.c.create_request_id == create_request_id)
+    ).scalar_one_or_none()
+
+
+def insert_session(
+    conn: Connection,
+    *,
+    create_request_id: str,
+    row: SessionRow,
+    token_hash: str,
+    now: datetime,
+) -> None:
+    """Cria a sessão e a credencial do aluno. `IntegrityError` se o `request_id` já foi usado."""
+    state = row.state
+    conn.execute(
+        insert(sessions).values(
+            session_id=state.session_id,
+            content_version=state.content_version,
+            create_request_id=create_request_id,
+            connection_generation=row.connection_generation,
+            controller_id=row.controller_id,
+            created_at=now,
+            updated_at=now,
+            expires_at=row.expires_at,
+            **_summary_columns(state),
+        )
+    )
+    conn.execute(
+        insert(session_credentials).values(
+            token_hash=token_hash, session_id=state.session_id, actor="learner", created_at=now
+        )
+    )
+
+
+def save_session(
+    conn: Connection, *, expected_revision: int, row: SessionRow, now: datetime
+) -> None:
+    """Grava o novo estado só se a revisão ainda é a esperada: segunda defesa contra escrita
+    concorrente, depois do `FOR UPDATE`."""
+    state = row.state
+    result = conn.execute(
+        update(sessions)
+        .where(sessions.c.session_id == state.session_id, sessions.c.revision == expected_revision)
+        .values(
+            connection_generation=row.connection_generation,
+            controller_id=row.controller_id,
+            updated_at=now,
+            **_summary_columns(state),
+        )
+    )
+    if result.rowcount != 1:
+        raise SessionError("STALE_REVISION")
+
+
+# --- eventos ------------------------------------------------------------------------------------
+
+
+def append_events(
+    conn: Connection,
+    session_id: str,
+    events: Sequence[DomainEvent],
+    *,
+    first_seq: int,
+    revision: int,
+    actor: str,
+    command_id: str | None,
+    now: datetime,
+    event_id: Callable[[], str],
+) -> list[EventRecord]:
+    """Grava os eventos do domínio como vieram, com `event_seq` contínuo a partir de `first_seq`.
+    `event_id` gera um id opaco por evento."""
+    records = [
+        EventRecord(
+            event_id=event_id(),
+            session_id=session_id,
+            event_seq=first_seq + offset,
+            revision=revision,
+            type=event.type,
+            actor=actor,
+            command_id=command_id,
+            attempt_id=event.attempt_id,
+            occurred_at=now,
+            data=dict(event.data),
+        )
+        for offset, event in enumerate(events)
+    ]
+    if records:
+        conn.execute(
+            insert(session_events),
+            [
+                {
+                    "event_id": r.event_id,
+                    "session_id": r.session_id,
+                    "event_seq": r.event_seq,
+                    "revision": r.revision,
+                    "type": r.type,
+                    "actor": r.actor,
+                    "command_id": r.command_id,
+                    "attempt_id": r.attempt_id,
+                    "occurred_at": r.occurred_at,
+                    "data": r.data,
+                }
+                for r in records
+            ],
+        )
+    return records
+
+
+# --- tentativas ---------------------------------------------------------------------------------
+
+
+def upsert_attempts(
+    conn: Connection, state: SessionState, *, outcomes: Mapping[str, str] | None = None
+) -> None:
+    """Mantém `attempts` em dia com o estado. Só toca a linha que mudou (e então grava
+    `updated_revision`). `outcomes` traz o resultado classificado por tentativa (do evento
+    `attempt_evaluated` deste comando); sem ele, o `outcome` já gravado fica como está."""
+    outcomes = outcomes or {}
+    existing = {
+        row.attempt_id: row
+        for row in conn.execute(
+            select(
+                attempts.c.attempt_id,
+                attempts.c.kind,
+                attempts.c.item_id,
+                attempts.c.status,
+                attempts.c.outcome,
+                attempts.c.assistance_level,
+                attempts.c.support_resources,
+            ).where(attempts.c.session_id == state.session_id)
+        )
+    }
+    for attempt in state.attempts:
+        wanted: dict[str, Any] = {
+            "kind": attempt.kind,
+            "item_id": attempt.item_id,
+            "status": attempt.status,
+            "assistance_level": attempt.ledger.level,
+            "support_resources": sorted(attempt.ledger.resources),
+        }
+        current = existing.get(attempt.attempt_id)
+        outcome = outcomes.get(attempt.attempt_id, current.outcome if current else None)
+        wanted["outcome"] = outcome
+        if current is None:
+            conn.execute(
+                insert(attempts).values(
+                    session_id=state.session_id,
+                    attempt_id=attempt.attempt_id,
+                    updated_revision=state.revision,
+                    **wanted,
+                )
+            )
+        elif any(getattr(current, key) != value for key, value in wanted.items()):
+            conn.execute(
+                update(attempts)
+                .where(
+                    attempts.c.session_id == state.session_id,
+                    attempts.c.attempt_id == attempt.attempt_id,
+                )
+                .values(updated_revision=state.revision, **wanted)
+            )
+
+
+# --- resultados idempotentes --------------------------------------------------------------------
+
+
+def find_result(conn: Connection, session_id: str, command_id: str) -> StoredResult | None:
+    found = conn.execute(
+        select(
+            command_results.c.kind,
+            command_results.c.body_hash,
+            command_results.c.actor,
+            command_results.c.principal_id,
+            command_results.c.http_status,
+            command_results.c.response,
+            command_results.c.revision,
+        ).where(
+            command_results.c.session_id == session_id,
+            command_results.c.command_id == command_id,
+        )
+    ).one_or_none()
+    if found is None:
+        return None
+    return StoredResult(
+        kind=found.kind,
+        body_hash=found.body_hash,
+        actor=found.actor,
+        principal_id=found.principal_id,
+        http_status=found.http_status,
+        response=found.response,
+        revision=found.revision,
+    )
+
+
+def insert_result(
+    conn: Connection,
+    *,
+    session_id: str,
+    command_id: str,
+    kind: str,
+    body_hash: str,
+    actor: str,
+    principal_id: str,
+    http_status: int,
+    response: dict[str, Any],
+    revision: int,
+    now: datetime,
+) -> None:
+    """`IntegrityError` se a chave `(session_id, command_id)` já foi gravada por outra transação."""
+    conn.execute(
+        insert(command_results).values(
+            session_id=session_id,
+            command_id=command_id,
+            kind=kind,
+            body_hash=body_hash,
+            actor=actor,
+            principal_id=principal_id,
+            http_status=http_status,
+            response=response,
+            revision=revision,
+            created_at=now,
+        )
+    )
