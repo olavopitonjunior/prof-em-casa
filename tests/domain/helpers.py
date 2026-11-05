@@ -15,3 +15,6 @@ def scene_with_counts(task: TaskSpec, counts: list[int]) -> SceneState:
     return SceneState.model_validate(
         {**dict(base), "groups": tuple(groups), "available_piece_ids": tuple(ids[pos:])}
     )
+
+
+T12_4 = TaskSpec(dividend=12, divisor=4, unit="peças")
