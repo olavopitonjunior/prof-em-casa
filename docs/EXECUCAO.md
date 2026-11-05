@@ -61,7 +61,7 @@ documento não afirma ganho de aprendizagem.
 
 ## Onda final (correções da revisão)
 
-Itens F1 a F9 da revisão final, com teste vermelho antes de cada correção de comportamento: validação do ACK de render (R32), repetição de `POST /v1/sessions` após a expiração (R33), `claim-control` repetido sem ser mais o controlador (R34), 405/415 e `after_seq` limitado no envelope (R35), `evidence` não persistido (R36), jobs encerrados ao fechar/expirar, ator `vision_worker` e guarda `DomainError` na reconciliação, helper único de gravação (R37). No aceite, o AC-33 ganhou o caso que isola a guarda de tentativa e o AC-37 um controle positivo. O hash do commit de código desta onda está no `git log` (mensagem "onda final"); o registro de hash foi feito num commit de documentação seguinte.
+Itens F1 a F9 da revisão final, com teste vermelho antes de cada correção de comportamento: validação do ACK de render (R32), repetição de `POST /v1/sessions` após a expiração (R33), `claim-control` repetido sem ser mais o controlador (R34), 405/415 e `after_seq` limitado no envelope (R35), `evidence` não persistido (R36), jobs encerrados ao fechar/expirar, ator `vision_worker` e guarda `DomainError` na reconciliação, helper único de gravação (R37). No aceite, o AC-33 ganhou o caso que isola a guarda de tentativa e o AC-37 um controle positivo. Commit de código desta onda: `30b362d` (o registro do hash está num commit de documentação seguinte).
 
 ## Não comprovado neste incremento
 
@@ -106,7 +106,7 @@ de aprendizagem.
 | Ferramentas | uv 0.12.5, pytest 9.2.0 |
 | Postgres (cluster descartável dos testes) | 17.11 (Homebrew), `initdb`/`pg_ctl` sob `tmp_path_factory`, porta livre em 127.0.0.1, parado no teardown |
 | SQLite (`sqlite3.sqlite_version`) | 3.53.1 |
-| Código sob teste | branch `feat/incremento-2-sessao`, base `09bcdc8`; último commit de código da Task 7 `0f938e5`; testes de aceite e rastreabilidade (Task 8) em `9f1d5f1`; onda final de correções (ACK, expiração, envelope 405/415, `after_seq`, controle, evidence, jobs encerrados, AC-33/AC-37) no commit descrito em "Onda final" abaixo |
+| Código sob teste | branch `feat/incremento-2-sessao`, base `09bcdc8`; último commit de código da Task 7 `0f938e5`; testes de aceite e rastreabilidade (Task 8) em `9f1d5f1`; onda final de correções (ACK, expiração, envelope 405/415, `after_seq`, controle, evidence, jobs encerrados, AC-33/AC-37) em `30b362d` (ver "Onda final" abaixo) |
 | Data | 2026-11-05 |
 
 ## Comandos e resultado (incremento 2)
