@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -19,19 +20,21 @@ from sqlalchemy.exc import IntegrityError
 
 from app.content.loader import ContentPackage
 from app.domain.division.classification import ExplanationEvaluator
-from app.domain.division.commands import load_json_object, parse_command
+from app.domain.division.commands import MAX_REVISION, Actor, load_json_object, parse_command
 from app.domain.division.errors import DomainError
 from app.domain.division.session import apply_command
 from app.domain.division.state import new_session
 from app.sessions import repository
 from app.sessions.context import ActorContext, Clock, IdFactory, default_ids, utc_now
-from app.sessions.credentials import derive_session_token, hash_token
+from app.sessions.credentials import derive_session_token, hash_token, match_service_token
 from app.sessions.errors import SessionError
-from app.sessions.projection import session_view
-from app.sessions.repository import SessionRow, StoredResult
+from app.sessions.projection import Audience, project_event, session_view
+from app.sessions.receipts import RenderReceipt
+from app.sessions.repository import SessionEvent, SessionRow, StoredResult
 
 # Decisão P2: o request_id é o segredo de onde sai o token, então precisa de alta entropia.
 _REQUEST_ID_RE = re.compile(r"[A-Za-z0-9_-]{22,128}")
+MAX_EVENTS_PAGE = 1000
 # NUL e substitutos soltos não existem em texto Unicode válido e o JSONB do Postgres os recusa.
 _BAD_TEXT_RE = re.compile("[\x00\ud800-\udfff]")
 
@@ -97,6 +100,7 @@ class SessionService:
         clock: Clock = utc_now,
         ids: IdFactory = default_ids,
         session_ttl: timedelta = timedelta(hours=24),
+        service_token_hashes: Mapping[str, Actor] | None = None,
     ) -> None:
         self.engine = engine
         self.content = content
@@ -105,6 +109,27 @@ class SessionService:
         self._clock = clock
         self._ids = ids
         self._ttl = session_ttl
+        self._service_hashes: Mapping[str, Actor] = dict(service_token_hashes or {})
+
+    # --- autenticação ----------------------------------------------------------------------------
+
+    def authenticate(self, bearer: str | None, controller_id: str | None) -> ActorContext:
+        """Token -> ator. Só prova quem chama: a sessão alcançada e o controle vêm depois.
+
+        Token de serviço alcança todas as sessões (`session_id=None`). Token de sessão alcança só a
+        sua e é sempre o aluno; `controller_id` é o cabeçalho `X-Controller-Id` (decisão P3).
+        """
+        if not bearer:
+            raise SessionError("UNAUTHENTICATED")
+        service_actor = match_service_token(bearer, self._service_hashes)
+        if service_actor is not None:
+            return ActorContext(service_actor, f"{service_actor}-service", None, None)
+        with self.engine.connect() as conn:
+            found = repository.find_credential(conn, hash_token(bearer))
+        if found is None:
+            raise SessionError("UNAUTHENTICATED")
+        session_id, _actor = found  # a coluna só admite 'learner' (CHECK)
+        return ActorContext("learner", session_id, session_id, controller_id)
 
     # --- criação ---------------------------------------------------------------------------------
 
@@ -177,6 +202,21 @@ class SessionService:
         return session_view(
             row.state, self.content, connection_generation=row.connection_generation
         )
+
+    def list_events(
+        self, ctx: ActorContext, session_id: str, after_seq: int = 0, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Retomada incremental: eventos com `event_seq > after_seq`, na projeção do ator. O
+        aluno nunca recebe correção (a lista de permitidos de `project_event`)."""
+        if after_seq < 0 or not 1 <= limit <= MAX_EVENTS_PAGE:
+            raise SessionError("INVALID_PAYLOAD", "after_seq must be >= 0 and 1 <= limit <= 1000")
+        self._reject_foreign_session(ctx, session_id)
+        with self.engine.connect() as conn:
+            row = repository.load_session(conn, session_id, for_update=False)
+            self._authorize(ctx, row, write=False)
+            records = repository.list_events(conn, session_id, after_seq=after_seq, limit=limit)
+        audience: Audience = "learner" if ctx.actor == "learner" else "service"
+        return [project_event(record, audience) for record in records]
 
     # --- comando ---------------------------------------------------------------------------------
 
@@ -293,6 +333,149 @@ class SessionService:
                 now=now,
             )
         return CommandOutcome(status_code=200, body=response, replay=False)
+
+    # --- controle --------------------------------------------------------------------------------
+
+    def claim_control(
+        self, ctx: ActorContext, session_id: str, request_id: str, expected_revision: int
+    ) -> dict[str, Any]:
+        """Decisão P4: o dispositivo que chama vira o controlador. Sobe `connection_generation`,
+        `turn_epoch` e `revision` numa única transação e grava `control_claimed`. Não exige ser o
+        controlador atual; é o caso da segunda aba."""
+        self._reject_foreign_session(ctx, session_id)
+        if not isinstance(request_id, str) or not _REQUEST_ID_RE.fullmatch(request_id):
+            raise SessionError(
+                "INVALID_PAYLOAD", "request_id must be 22 to 128 url-safe characters"
+            )
+        if (
+            not isinstance(expected_revision, int)
+            or isinstance(expected_revision, bool)
+            or not 0 <= expected_revision <= MAX_REVISION
+        ):
+            raise SessionError("INVALID_PAYLOAD", "expected_revision must be a valid revision")
+        now = self._clock()
+        with self.engine.begin() as conn:
+            row = repository.load_session(conn, session_id, for_update=True)
+            self._authorize(ctx, row, write=False)
+            assert row is not None
+            if ctx.actor != "learner":
+                raise SessionError("ACTION_NOT_ALLOWED", "only the learner device holds control")
+            digest = body_hash(
+                ctx.actor,
+                {
+                    "type": "claim_control",
+                    "request_id": request_id,
+                    "expected_revision": expected_revision,
+                },
+            )
+            stored = repository.find_result(conn, session_id, request_id)
+            if stored is not None:
+                if stored.kind != "claim_control" or stored.body_hash != digest:
+                    raise SessionError("IDEMPOTENCY_CONFLICT", command_id=request_id)
+                return dict(stored.response)
+            before = row.state
+            if before.session_status == "closed":
+                raise SessionError("ACTION_NOT_ALLOWED", "session_closed")
+            if before.revision != expected_revision:
+                raise SessionError(
+                    "STALE_REVISION",
+                    f"current revision is {before.revision}",
+                    current_revision=before.revision,
+                    current_scene_revision=before.scene_revision,
+                )
+            generation = row.connection_generation + 1
+            event = SessionEvent(
+                "control_claimed",
+                before.active_attempt_id,
+                {"connection_generation": generation, "turn_epoch": before.turn_epoch + 1},
+            )
+            after = before.with_changes(
+                turn_epoch=before.turn_epoch + 1,
+                revision=before.revision + 1,
+                last_event_seq=before.last_event_seq + 1,
+            )
+            repository.save_session(
+                conn,
+                expected_revision=before.revision,
+                row=SessionRow(
+                    state=after,
+                    connection_generation=generation,
+                    controller_id=request_id,
+                    expires_at=row.expires_at,
+                ),
+                now=now,
+            )
+            repository.append_events(
+                conn,
+                session_id,
+                [event],
+                first_seq=before.last_event_seq + 1,
+                revision=after.revision,
+                actor=ctx.actor,
+                command_id=request_id,
+                now=now,
+                event_id=lambda: self._ids("evt"),
+            )
+            response = {
+                "controller_id": request_id,
+                "connection_generation": generation,
+                "revision": after.revision,
+                "turn_epoch": after.turn_epoch,
+            }
+            repository.insert_result(
+                conn,
+                session_id=session_id,
+                command_id=request_id,
+                kind="claim_control",
+                body_hash=digest,
+                actor=ctx.actor,
+                principal_id=ctx.principal_id,
+                http_status=200,
+                response=response,
+                revision=after.revision,
+                now=now,
+            )
+        return response
+
+    # --- ACK de render ---------------------------------------------------------------------------
+
+    def record_render_receipt(
+        self, ctx: ActorContext, session_id: str, receipt: RenderReceipt
+    ) -> dict[str, Any]:
+        """Registra o ACK sem tocar o domínio: nunca muda `revision`. Só o controlador vigente
+        escreve (P3); ACK de geração antiga ou de cena futura é gravado como `stale`."""
+        self._reject_foreign_session(ctx, session_id)
+        if receipt.session_id != session_id:
+            raise SessionError("INVALID_PAYLOAD", "session_id mismatch")
+        now = self._clock()
+        with self.engine.begin() as conn:
+            row = repository.load_session(conn, session_id, for_update=True)
+            self._authorize(ctx, row, write=True)
+            assert row is not None
+            if ctx.actor != "learner":
+                raise SessionError(
+                    "ACTION_NOT_ALLOWED", "only the controlling device sends receipts"
+                )
+            if repository.receipt_exists(conn, session_id, receipt.receipt_id):
+                return {"receipt_id": receipt.receipt_id, "outcome": "duplicate"}
+            stale = (
+                receipt.connection_generation != row.connection_generation
+                or receipt.scene_revision > row.state.scene_revision
+            )
+            outcome = "stale" if stale else "accepted"
+            repository.insert_receipt(
+                conn,
+                session_id=session_id,
+                receipt_id=receipt.receipt_id,
+                effect_id=receipt.effect_id,
+                command_id=receipt.command_id,
+                scene_revision=receipt.scene_revision,
+                connection_generation=receipt.connection_generation,
+                status=receipt.status,
+                outcome=outcome,
+                now=now,
+            )
+        return {"receipt_id": receipt.receipt_id, "outcome": outcome}
 
     # --- passos compartilhados -------------------------------------------------------------------
 

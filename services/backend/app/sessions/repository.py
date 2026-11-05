@@ -11,20 +11,40 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import Connection, insert, select, update
 
 from app.db.schema import (
     attempts,
     command_results,
+    render_receipts,
     session_credentials,
     session_events,
     sessions,
 )
-from app.domain.division.state import DomainEvent, SessionState
+from app.domain.division.state import SessionState
 from app.sessions.errors import SessionError
 from app.sessions.projection import EventRecord
+
+
+class NewEvent(Protocol):
+    """O que `append_events` precisa de um evento: os `DomainEvent` do domínio servem, e também os
+    eventos da camada `sessions` (`control_claimed`), que não são comandos do catálogo."""
+
+    @property
+    def type(self) -> str: ...
+    @property
+    def attempt_id(self) -> str | None: ...
+    @property
+    def data(self) -> Mapping[str, Any]: ...
+
+
+@dataclass(frozen=True)
+class SessionEvent:
+    type: str
+    attempt_id: str | None
+    data: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -147,7 +167,7 @@ def save_session(
 def append_events(
     conn: Connection,
     session_id: str,
-    events: Sequence[DomainEvent],
+    events: Sequence[NewEvent],
     *,
     first_seq: int,
     revision: int,
@@ -193,6 +213,89 @@ def append_events(
             ],
         )
     return records
+
+
+def list_events(
+    conn: Connection, session_id: str, *, after_seq: int, limit: int
+) -> list[EventRecord]:
+    """Eventos com `event_seq > after_seq`, em ordem, no máximo `limit`."""
+    rows = conn.execute(
+        select(session_events)
+        .where(session_events.c.session_id == session_id, session_events.c.event_seq > after_seq)
+        .order_by(session_events.c.event_seq)
+        .limit(limit)
+    ).mappings()
+    return [
+        EventRecord(
+            event_id=r["event_id"],
+            session_id=r["session_id"],
+            event_seq=r["event_seq"],
+            revision=r["revision"],
+            type=r["type"],
+            actor=r["actor"],
+            command_id=r["command_id"],
+            attempt_id=r["attempt_id"],
+            occurred_at=r["occurred_at"],
+            data=r["data"],
+        )
+        for r in rows
+    ]
+
+
+# --- credenciais --------------------------------------------------------------------------------
+
+
+def find_credential(conn: Connection, token_hash: str) -> tuple[str, str] | None:
+    """`(session_id, actor)` da credencial de sessão com esse hash, se existir."""
+    found = conn.execute(
+        select(session_credentials.c.session_id, session_credentials.c.actor).where(
+            session_credentials.c.token_hash == token_hash
+        )
+    ).one_or_none()
+    return None if found is None else (found.session_id, found.actor)
+
+
+# --- ACK de render ------------------------------------------------------------------------------
+
+
+def receipt_exists(conn: Connection, session_id: str, receipt_id: str) -> bool:
+    return (
+        conn.execute(
+            select(render_receipts.c.receipt_id).where(
+                render_receipts.c.session_id == session_id,
+                render_receipts.c.receipt_id == receipt_id,
+            )
+        ).first()
+        is not None
+    )
+
+
+def insert_receipt(
+    conn: Connection,
+    *,
+    session_id: str,
+    receipt_id: str,
+    effect_id: str,
+    command_id: str,
+    scene_revision: int,
+    connection_generation: int,
+    status: str,
+    outcome: str,
+    now: datetime,
+) -> None:
+    conn.execute(
+        insert(render_receipts).values(
+            session_id=session_id,
+            receipt_id=receipt_id,
+            effect_id=effect_id,
+            command_id=command_id,
+            scene_revision=scene_revision,
+            connection_generation=connection_generation,
+            status=status,
+            outcome=outcome,
+            received_at=now,
+        )
+    )
 
 
 # --- tentativas ---------------------------------------------------------------------------------
