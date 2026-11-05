@@ -267,9 +267,13 @@ def test_ac33_slow_v1_does_not_overwrite_v2(client, svc, engine, db_url):
     assert svc.complete_analysis(WORKER, v3["job_id"], stale_obs) == "superseded"
     assert tab.snapshot() == snap and snap["analysis"] is None  # não vaza para o item novo
 
-    # isola a guarda de tentativa: na jornada normal toda saída da captura já supersede o job
-    # (acima), então só um job reaberto à força (`queued`) chega ao teste de vigência. Aí o
-    # resultado da tentativa antiga ainda precisa ser rejeitado, sem tocar o item novo.
+    # job reaberto à força (`queued`): na jornada normal toda saída da captura já supersede o job
+    # (acima). Aqui o resultado da tentativa antiga é recusado porque deixou de ser o do artefato
+    # vigente (na transferência `active_artifact` é None, e o check de artefato dispara antes do
+    # de tentativa). O que este caso prova é que o job é superseded quando não casa mais com o
+    # artefato/tentativa atuais, sem tocar o item novo. A guarda de tentativa isolada não é
+    # coberta por este teste de aceite: está em unit, em
+    # tests/domain/test_analysis.py::test_result_with_matching_artifact_but_another_attempt_is_superseded.
     with engine.begin() as conn:
         conn.execute(
             update(analysis_jobs)
