@@ -323,3 +323,94 @@ def test_bbox_tolerance():
     assert validate_observation(NotebookObservation.model_validate(raw)) == []
     raw["groups"][0]["bbox"].update(x=0.5, width=0.5000001)
     assert validate_observation(NotebookObservation.model_validate(raw)) == ["BBOX_OUT_OF_BOUNDS"]
+
+
+# --- revisão final: ambiguidade de expressão e observação inválida ------------------------------
+
+
+def _usable_with_groups(**mutations) -> NotebookObservation:
+    raw = load_raw("observacao-5-5-5-5")
+    raw["expression"]["answer"] = 6
+    template = raw["groups"][0]
+    raw["groups"] = [
+        {**template, "group_id": f"g{i}", "count": 6, "uncertain": False} for i in range(4)
+    ]
+    raw.update(mutations)
+    return NotebookObservation.model_validate(raw)
+
+
+@pytest.mark.parametrize("status", ["usable", "needs_clarification"])
+def test_expression_answer_ambiguity_makes_written_answer_unreadable(status):
+    obs = _usable_with_groups(
+        status=status, ambiguities=[{"field_path": "/expression/answer", "reason": "illegible"}]
+    )
+    v = verify_observation(T24_4, 6, obs, [])
+    assert "written_answer" not in v.facts
+    assert "WRITTEN_ANSWER_MISMATCH" not in v.issues
+    assert v.status == "inconclusive" and v.reconstruction_allowed is False
+    r = build_reconstruction(T24_4, obs, [], **ids)
+    assert isinstance(r, ReconstructionUnavailable)
+
+
+def test_usable_observation_with_expression_ambiguity_is_not_consistent():
+    obs = _usable_with_groups(
+        status="usable", ambiguities=[{"field_path": "/expression/answer", "reason": "illegible"}]
+    )
+    v = verify_observation(T24_4, 6, obs, [])
+    assert v.facts.get("written_answer") != 6 and v.status != "consistent"
+
+
+@pytest.mark.parametrize(
+    ("path", "wrong"),
+    [
+        ("/expression/dividend", {"dividend": 99}),
+        ("/expression/divisor", {"divisor": 3}),
+        ("/expression", {"dividend": 99, "divisor": 3}),
+    ],
+)
+def test_other_expression_ambiguities_do_not_feed_mismatch(path, wrong):
+    # Campo errado mas ilegível: não pode gerar EXPRESSION_MISMATCH.
+    raw = load_raw("observacao-5-5-5-5")
+    raw["expression"].update(wrong, answer=5)
+    raw["ambiguities"] = [{"field_path": path, "reason": "illegible"}]
+    v = verify_observation(T24_4, 6, NotebookObservation.model_validate(raw), [])
+    assert "EXPRESSION_MISMATCH" not in v.issues
+    assert v.status == "inconclusive" and v.reconstruction_allowed is False
+    if path == "/expression":
+        assert "written_answer" not in v.facts and "WRITTEN_ANSWER_MISMATCH" not in v.issues
+
+
+def test_expression_ambiguity_only_hides_its_own_field():
+    raw = load_raw("observacao-5-5-5-5")
+    raw["expression"].update(dividend=99, answer=5)
+    raw["ambiguities"] = [{"field_path": "/expression/dividend", "reason": "illegible"}]
+    v = verify_observation(T24_4, 6, NotebookObservation.model_validate(raw), [])
+    assert v.facts["written_answer"] == 5 and "WRITTEN_ANSWER_MISMATCH" in v.issues
+
+
+def _invalid_observation() -> NotebookObservation:
+    raw = load_raw("observacao-5-5-5-5")
+    raw["expression"]["answer"] = 6
+    template = raw["groups"][0]
+    raw["groups"] = [{**template, "group_id": "dup", "count": 6} for _ in range(4)]
+    raw["groups"][0] = {
+        **raw["groups"][0],
+        "bbox": {"x": 0.9, "y": 0.9, "width": 0.5, "height": 0.5},
+    }
+    return NotebookObservation.model_validate(raw)
+
+
+def test_invalid_observation_is_inconclusive_and_never_sufficient():
+    from app.domain.division.classification import evaluate_artifact_explanation
+
+    obs = _invalid_observation()
+    assert {"DUPLICATE_GROUP_ID", "BBOX_OUT_OF_BOUNDS"} <= set(validate_observation(obs))
+    v = verify_observation(T24_4, 6, obs, [])
+    assert v.status == "inconclusive" and v.reconstruction_allowed is False
+    assert {"DUPLICATE_GROUP_ID", "BBOX_OUT_OF_BOUNDS"} <= set(v.issues)  # códigos em `issues`
+    assert evaluate_artifact_explanation(T24_4, v).rating == "unclear"
+
+
+def test_valid_fixtures_do_not_gain_validation_issues():
+    v = verify_observation(T24_4, 6, load_obs("observacao-corrigida"), [])
+    assert v.status == "consistent" and v.issues == ()

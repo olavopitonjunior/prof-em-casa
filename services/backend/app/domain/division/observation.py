@@ -126,6 +126,8 @@ class Verification(BaseModel):
     observation_id: str
     status: Literal["consistent", "inconsistent", "inconclusive"]
     facts: dict[str, Any]
+    # Códigos de divergência com a tarefa e, quando `validate_observation` reprova o documento,
+    # os códigos dessa validação (ex.: DUPLICATE_GROUP_ID); nesse caso o status é "inconclusive".
     issues: tuple[str, ...]
     reconstruction_allowed: bool
 
@@ -188,6 +190,27 @@ def _ambiguous_group_indexes(obs: NotebookObservation) -> set[int]:
     return found
 
 
+def _unreadable_expression_fields(obs: NotebookObservation) -> frozenset[str]:
+    """Campos da expressão com ambiguidade em /expression ou abaixo, seja qual for obs.status."""
+    fields: set[str] = set()
+    for a in obs.ambiguities:
+        path = a.field_path
+        if path == "/expression":
+            fields |= {"dividend", "divisor", "answer"}
+        elif path.startswith("/expression/"):
+            name = path.removeprefix("/expression/")
+            fields |= (
+                {name}
+                if name in {"dividend", "divisor", "answer"}
+                else {
+                    "dividend",
+                    "divisor",
+                    "answer",
+                }
+            )
+    return frozenset(fields)
+
+
 def _resolve_counts(obs: NotebookObservation, clarifications: list[Clarification]) -> _Counts:
     ambiguous = _ambiguous_group_indexes(obs)
     given: dict[int, int] = {}
@@ -233,6 +256,8 @@ def _reconstruction_blocker(
         return "NO_GROUPS"
     if validate_observation(obs):
         return "INVALID_OBSERVATION"
+    if _unreadable_expression_fields(obs):
+        return "UNRESOLVED_EXPRESSION_AMBIGUITY"
     if any(v is None for v in values):
         return "UNUSABLE_COUNTS"
     if obs.status == "needs_clarification" and _unresolved_ambiguities(obs, counts):
@@ -252,6 +277,12 @@ _ISSUE_ORDER = (
     "EXPRESSION_MISMATCH",
     "WRITTEN_ANSWER_MISMATCH",
 )
+_VALIDATION_ORDER = (
+    "BBOX_OUT_OF_BOUNDS",
+    "DUPLICATE_GROUP_ID",
+    "DANGLING_AMBIGUITY_PATH",
+    "UNCERTAIN_WITHOUT_AMBIGUITY",
+)
 
 
 def verify_observation(
@@ -268,11 +299,17 @@ def verify_observation(
     issues: list[str] = []
     facts: dict[str, Any] = {"task_total": task.dividend, "task_groups": task.divisor}
 
-    # Expressão: só vale o que está legível.
-    readable = not expr.uncertain
-    dividend = expr.dividend if readable else None
-    divisor = expr.divisor if readable else None
-    answer = expr.answer if readable else None
+    # Expressão: só vale o que está legível. Ambiguidade em /expression ou abaixo (qualquer
+    # obs.status) torna o campo ilegível; expression.uncertain torna todos ilegíveis.
+    unreadable = _unreadable_expression_fields(obs)
+    all_readable = not expr.uncertain
+
+    def read(name: str, value: int | None) -> int | None:
+        return value if all_readable and name not in unreadable else None
+
+    dividend = read("dividend", expr.dividend)
+    divisor = read("divisor", expr.divisor)
+    answer = read("answer", expr.answer)
     if (dividend is not None and dividend != task.dividend) or (
         divisor is not None and divisor != task.divisor
     ):
@@ -312,6 +349,12 @@ def verify_observation(
         inconclusive = answer is None and not issues
     if obs.status == "needs_clarification" and unresolved:
         inconclusive = True
+    if unreadable:  # ambiguidade de expressão vale independentemente do status declarado
+        inconclusive = True
+    invalid = validate_observation(obs)
+    if invalid:  # documento incoerente nunca vira "consistente" nem alimenta reconstrução
+        inconclusive = True
+        issues.extend(invalid)
 
     if inconclusive:
         status = "inconclusive"
@@ -323,7 +366,7 @@ def verify_observation(
         observation_id=obs.observation_id,
         status=status,
         facts=facts,
-        issues=tuple(i for i in _ISSUE_ORDER if i in issues),
+        issues=tuple(i for i in (*_ISSUE_ORDER, *_VALIDATION_ORDER) if i in issues),
         reconstruction_allowed=_reconstruction_blocker(task, obs, counts) is None,
     )
 

@@ -296,6 +296,61 @@ def test_pausing_twice_is_a_no_op():
     assert _code(p, cmd("pause_session")).code == "NO_OP"
 
 
+def test_resume_returns_to_active_and_keeps_phase_and_scene():
+    p = run(session_after_demo_steps(3), cmd("pause_session"))
+    r = apply(p, cmd("resume_session"))
+    assert r.session.session_status == "active" and r.session.phase == p.phase
+    assert r.session.scene == p.scene and r.session.turn_epoch == p.turn_epoch
+    assert r.session.revision == p.revision + 1 and not r.scene_changed
+    assert _types(r) == ["session_resumed"]
+
+
+def test_pause_then_resume_then_demo_continues():
+    p = run(session_after_demo_steps(3), cmd("pause_session"))
+    assert _code(p, cmd("run_demo_step", actor="system", step_id="r1-g4")).detail == (
+        "session_paused"
+    )
+    s = run(p, cmd("resume_session"))
+    s = run(s, cmd("run_demo_step", actor="system", step_id="r1-g4"))
+    assert s.session_status == "active" and s.scene_revision == p.scene_revision + 1
+
+
+def test_resume_requires_a_paused_session():
+    assert _code(session_in_practice(), cmd("resume_session")).code == "NO_OP"
+
+
+def test_resume_is_not_revision_exempt():  # Parte II §2 isenta só pause/interrupt/learner_stopped
+    p = run(session_in_practice(), cmd("pause_session"))
+    assert _code(p, cmd("resume_session", expected_revision=0)).code == "STALE_REVISION"
+    assert _code(p, cmd("resume_session", attempt_id="other")).code == "ATTEMPT_CHANGED"
+
+
+@pytest.mark.parametrize("actor", ["tutor", "system"])
+def test_only_the_learner_resumes(actor):
+    p = run(session_in_practice(), cmd("pause_session"))
+    c = cmd("resume_session", actor="learner")
+    assert _code(p, c, as_actor=actor).code == "ACTION_NOT_ALLOWED"
+
+
+def test_closed_session_cannot_resume():
+    s = run(session_in_practice(), cmd("close_session", reason="learner_stopped"))
+    assert _code(s, cmd("resume_session")).detail == "session_closed"
+
+
+def test_learner_keeps_acting_while_paused():  # a pausa bloqueia só tutor/sistema
+    p = run(practice_with_counts([1, 0, 0, 0]), cmd("pause_session"))
+    r = apply(
+        p,
+        cmd(
+            "move_piece",
+            piece_id="piece-02",
+            from_location="available",
+            to_location="group-1",
+        ),
+    )
+    assert r.session.session_status == "paused"
+
+
 def test_paused_session_blocks_tutor_and_system_but_not_close():
     p = run(session_after_demo_steps(3), cmd("pause_session"))
     for actor in ("tutor", "system"):
@@ -309,6 +364,12 @@ def test_close_learner_stopped_with_stale_revision_accepted():
     s = practice_with_counts([2, 0, 0, 0])
     r = apply(s, cmd("close_session", reason="learner_stopped", expected_revision=0))
     assert r.session.session_status == "closed" and r.session.phase == "summary"
+
+
+def test_system_learner_stopped_close_does_not_skip_revision_check():
+    s = session_in_practice()
+    c = cmd("close_session", actor="system", reason="learner_stopped", expected_revision=0)
+    assert _code(s, c).code == "STALE_REVISION"
 
 
 @pytest.mark.parametrize("reason", ["limit_reached", "completed"])
@@ -608,7 +669,6 @@ def test_full_journey_ends_in_summary_and_complete_close():
         cmd("set_projection"),
         cmd("apply_help", actor="system"),
         cmd("set_thinking"),
-        cmd("resume_session"),
         cmd("interrupt_turn", actor="system"),
     ],
 )

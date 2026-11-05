@@ -38,10 +38,15 @@ _IMMEDIATE_CONTROL = frozenset({"pause_session", "interrupt_turn"})
 _ALLOWED_WHILE_PAUSED = frozenset({"pause_session", "interrupt_turn", "close_session"})
 
 
-def _is_immediate_control(command: Command) -> bool:
+def _is_immediate_control(command: Command, actor: Actor) -> bool:
     if command.type in _IMMEDIATE_CONTROL:
         return True
-    return command.type == "close_session" and command.payload.reason == "learner_stopped"
+    # A isenção de close_session(learner_stopped) é da criança; o sistema obedece à revisão.
+    return (
+        command.type == "close_session"
+        and actor == "learner"
+        and command.payload.reason == "learner_stopped"
+    )
 
 
 def apply_command(
@@ -63,7 +68,7 @@ def apply_command(
     if command.attempt_id != session.active_attempt_id:
         raise DomainError("ATTEMPT_CHANGED", "attempt_id is not the active attempt")
     # (3) e (4): revisões, salvo controle imediato
-    if not _is_immediate_control(command):
+    if not _is_immediate_control(command, actor):
         if command.expected_revision != session.revision:
             raise DomainError("STALE_REVISION", f"current revision is {session.revision}")
         if ctype in SCENE_COMMANDS and command.expected_scene_revision != session.scene_revision:

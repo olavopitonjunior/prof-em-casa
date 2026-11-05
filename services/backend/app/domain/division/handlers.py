@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.content.loader import ContentItem, ContentPackage
-from app.domain.division.assistance import apply_help_effect
+from app.domain.division.assistance import AssistanceLedger, apply_help_effect
 from app.domain.division.classification import (
     ExplanationEvaluator,
     ExplanationResult,
@@ -303,7 +303,11 @@ def enter_notebook(ctx: Ctx) -> Outcome:
     if intent == "try_on_paper":  # papel é recurso de apoio, não ajuda: o nível não sobe
         attempt = _active(s)
         ledger = attempt.ledger
-        paper = ledger.model_copy(update={"resources": ledger.resources | {"paper"}})
+        paper = AssistanceLedger(
+            level=ledger.level,
+            resources=ledger.resources | {"paper"},
+            reasons=ledger.reasons,
+        )
         updated = _with_attempt(updated, attempt.with_changes(ledger=paper))
     event = _event(
         "notebook_entered", s.active_attempt_id, intent=intent, return_phase=return_phase
@@ -381,6 +385,17 @@ def pause_session(ctx: Ctx) -> Outcome:
     return Outcome(updated, [event])
 
 
+def resume_session(ctx: Ctx) -> Outcome:
+    """Parte II §2: sem isenção de revisão (só pause/interrupt/learner_stopped têm); só da pausa.
+    Mantém fase, cena e turn_epoch: a pausa já invalidou os turnos antigos do tutor."""
+    s = ctx.session
+    if s.session_status != "paused":
+        raise DomainError("NO_OP", "session is not paused")
+    updated = s.with_changes(session_status="active")
+    event = _event("session_resumed", s.active_attempt_id, turn_epoch=updated.turn_epoch)
+    return Outcome(updated, [event])
+
+
 def close_session(ctx: Ctx) -> Outcome:
     s, reason = ctx.session, ctx.command.payload.reason
     if reason == "completed" and s.phase != "summary":
@@ -419,5 +434,6 @@ HANDLERS: dict[str, Callable[[Ctx], Outcome]] = {
     "submit_explanation": submit_explanation,
     "continue_after_explanation": continue_after_explanation,
     "pause_session": pause_session,
+    "resume_session": resume_session,
     "close_session": close_session,
 }
