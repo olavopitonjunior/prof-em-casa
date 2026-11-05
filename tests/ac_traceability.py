@@ -78,5 +78,6 @@ class ACTraceability:
             )
 
 
+# Opt-out explícito: `pytest -p no:ac-traceability` desliga o hook (o plugin é registrado com esse nome).
 def register(config) -> None:
     config.pluginmanager.register(ACTraceability(config), "ac-traceability")

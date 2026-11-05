@@ -218,6 +218,8 @@ def finish_demonstration(ctx: Ctx) -> Outcome:
             item_id=guided.item_id,
             after_partial_demonstration=partial,
             completed_rounds=done,
+            demo_finish_reason=reason,  # o pedido explícito da criança fica registrado
+            requested_by=ctx.actor,
         ),
         _event("scene_changed", guided.attempt_id, reason="scene_created"),
     ]
@@ -298,6 +300,11 @@ def enter_notebook(ctx: Ctx) -> Outcome:
     updated = s.with_changes(
         interaction_mode="writing", return_phase=return_phase, notebook_intent=intent
     )
+    if intent == "try_on_paper":  # papel é recurso de apoio, não ajuda: o nível não sobe
+        attempt = _active(s)
+        ledger = attempt.ledger
+        paper = ledger.model_copy(update={"resources": ledger.resources | {"paper"}})
+        updated = _with_attempt(updated, attempt.with_changes(ledger=paper))
     event = _event(
         "notebook_entered", s.active_attempt_id, intent=intent, return_phase=return_phase
     )

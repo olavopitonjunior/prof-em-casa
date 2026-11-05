@@ -155,7 +155,7 @@ def test_run_demo_step_by_tutor_emits_events():
 # --- AC-05 / AC-06 ----------------------------------------------------------------------------
 
 
-@pytest.mark.ac("AC-05", "AC-06")
+@pytest.mark.ac("AC-05")
 def test_ac05_ac06_check_distribution_keeps_phase():
     s = practice_with_counts([7, 5, 6, 6])
     r = apply(s, cmd("check_distribution"))
@@ -435,6 +435,36 @@ def test_conceptual_help_raises_the_ledger_and_never_lowers_it():
 def test_alternate_strategy_is_allowed_in_the_guided_item():
     r = apply(session_in_practice(), cmd("request_help", kind="alternate_strategy", reason="x"))
     assert attempt(r.session, "guided").ledger.level == "demonstrated"
+
+
+def test_try_on_paper_adds_the_paper_resource_without_raising_the_level():
+    n = run(session_in_practice(), cmd("enter_notebook", intent="try_on_paper"))
+    ledger = attempt(n, "guided").ledger
+    assert ledger.resources == frozenset({"paper"}) and ledger.level == "none"
+    assert ledger.reasons == ()
+    again = run(run(n, cmd("return_to_activity")), cmd("enter_notebook", intent="try_on_paper"))
+    assert attempt(again, "guided").ledger == ledger  # idempotente
+
+
+def test_record_solution_does_not_add_the_paper_resource():
+    n = run(session_in_practice(), cmd("enter_notebook", intent="record_solution"))
+    assert attempt(n, "guided").ledger.resources == frozenset()
+
+
+def test_finish_demonstration_records_reason_and_requester():
+    r = apply(session_after_demo_steps(6), cmd("finish_demonstration", reason="learner_requested"))
+    started = next(e for e in r.events if e.type == "attempt_started")
+    assert started.data["demo_finish_reason"] == "learner_requested"
+    assert started.data["requested_by"] == "learner"
+    full = apply(
+        session_after_demo_steps(12),
+        cmd("finish_demonstration", actor="system", reason="completed"),
+    )
+    started = next(e for e in full.events if e.type == "attempt_started")
+    assert (started.data["demo_finish_reason"], started.data["requested_by"]) == (
+        "completed",
+        "system",
+    )
 
 
 def test_help_in_notebook_keeps_the_phase():

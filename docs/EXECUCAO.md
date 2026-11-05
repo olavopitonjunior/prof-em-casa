@@ -25,8 +25,8 @@ documento não afirma ganho de aprendizagem.
 
 | Comando | Resultado |
 |---|---|
-| `uv run pytest -q` | 473 passed |
-| `uv run pytest -q -m ac -rA` | 45 passed, 428 deselected; os 10 ACs com teste marcado e aprovado |
+| `uv run pytest -q` | 476 passed |
+| `uv run pytest -q -m ac -rA` | 45 passed, 431 deselected; os 10 ACs com teste marcado e aprovado |
 | `uv run ruff check .` | All checks passed |
 
 ## Como a rastreabilidade funciona
@@ -41,7 +41,7 @@ documento não afirma ganho de aprendizagem.
   nesta execução, a sessão termina com falha e imprime os ids ausentes.
 - Quando o hook vale: só em execução completa, ou seja, sem `-k`, `--deselect`, `--lf`, `--ff`,
   `--sw` ou `--co`, sem arquivo, diretório ou nodeid fora de `testpaths`, e com `-m` vazio ou
-  exatamente `-m ac`. Rodar um arquivo ou um `-k` isolado não falha por AC de outro arquivo.
+  exatamente `-m ac`. `-p no:ac-traceability` desliga o hook de forma explícita. Rodar um arquivo ou um `-k` isolado não falha por AC de outro arquivo.
   O comportamento do próprio hook é testado em `tests/test_ac_traceability.py` (pytester).
 
 ## Cobertura por AC (domínio)
@@ -49,11 +49,11 @@ documento não afirma ganho de aprendizagem.
 | AC | Teste de aceite | Parte comprovada |
 |---|---|---|
 | AC-03 | `test_ac03_complete_demonstration` | demonstração de 12 ÷ 4 termina em `[3,3,3,3]`, 0 disponíveis; o item guiado começa sem resposta |
-| AC-04 | `test_ac04_advance_request_before_and_after_the_first_round` | pedir para avançar antes da 1ª rodada é recusado; depois, avança como demonstração parcial |
+| AC-04 | `test_ac04_advance_request_before_and_after_the_first_round` | pedir para avançar antes da 1ª rodada é recusado; depois, avança como demonstração parcial, com o pedido registrado (`demo_finish_reason`, `requested_by`) |
 | AC-05 | `test_ac05_unequal_practice_detects_inequality_without_acting` | `[7,5,6,6]`: detecta desigualdade, escolhe `compare_groups`, não move peça nem marca domínio |
 | AC-06 | `test_ac06_equal_groups_with_available_pieces_ask_about_the_total` | `[5,5,5,5]` com 4 disponíveis: grupos iguais, total incompleto, `check_total_use`, sem "resto" |
 | AC-21 | `test_ac21_new_question_starts_clean` | 20 ÷ 5 sem cena, sem resposta, sem ajuda prévia, projeção pública sem quociente |
-| AC-22 | `test_ac22_correct_answer_with_sufficient_explanation_and_paper_is_without_item_help` | `applied_without_item_help`; resumo sem alegar domínio nem retenção |
+| AC-22 | `test_ac22_correct_answer_with_sufficient_explanation_and_paper_is_without_item_help` | `applied_without_item_help` com recurso `paper` no registro e nível `none`; resumo sem alegar domínio nem retenção |
 | AC-23 | `test_ac23_bare_answer_is_partial_evidence_and_never_sufficient_alone` | resposta isolada fica `answer_correct_evidence_partial` |
 | AC-24 | `test_ac24_help_is_recorded_before_the_resource_and_marks_support` | ajuda registrada antes da cena; resultado `applied_with_support` |
 | AC-27 | `test_ac27_rejected_commands_leave_no_partial_mutation` | revisão velha, tentativa trocada, cena velha, origem da peça incorreta: erro e sessão intacta |

@@ -95,6 +95,8 @@ def test_ac04_advance_request_before_and_after_the_first_round():
     assert r.session.phase == "practice" and demo.demo_partial and demo.status == "closed"
     started = next(ev for ev in r.events if ev.type == "attempt_started")
     assert started.data["after_partial_demonstration"] is True
+    assert started.data["demo_finish_reason"] == "learner_requested"  # pedido explícito registrado
+    assert started.data["requested_by"] == "learner"
     assert started.data["completed_rounds"] == 1  # 6 passos = 1 rodada e meia
     # A cena guiada começa limpa: não herda as peças da demonstração parcial.
     scene = _snap(r.session)["scene"]
@@ -157,7 +159,8 @@ def test_ac22_correct_answer_with_sufficient_explanation_and_paper_is_without_it
     outcome = r.events[-1]
     assert outcome.type == "attempt_evaluated" and outcome.data["final"] is False
     assert outcome.data["outcome"] == "applied_without_item_help"
-    assert attempt(r.session, "transfer").ledger == AssistanceLedger()
+    ledger = attempt(r.session, "transfer").ledger
+    assert ledger.resources == frozenset({"paper"}) and ledger.level == "none"  # papel não é ajuda
     done = apply(r.session, cmd("continue_after_explanation", reason="sufficient"))
     assert done.session.phase == "summary" and done.events[0].data["outcome"] == (
         "applied_without_item_help"
@@ -255,6 +258,7 @@ def test_ac27_rejected_commands_leave_no_partial_mutation(mutation, code):
 
 @pytest.mark.ac("AC-39")
 def test_ac39_invalid_json_extra_fields_and_unauthorized_actions_change_nothing():
+    """A propriedade é a fronteira de parse: o que é rejeitado nunca chega ao apply_command (o HTTP repete isto no incremento 2)."""
     s = _practice_with([1, 0, 0, 0])
     base = {
         "schema_version": "1.0",
@@ -265,29 +269,52 @@ def test_ac39_invalid_json_extra_fields_and_unauthorized_actions_change_nothing(
         "expected_scene_revision": s.scene_revision,
     }
     move = {"piece_id": "piece-02", "from_location": "available", "to_location": "group-2"}
-    bad = [
-        "{not json",
-        json.dumps({**base, "type": "move_piece", "payload": move, "js": "alert(1)"}),
-        json.dumps({**base, "type": "move_piece", "payload": {**move, "extra": 1}}),
-        json.dumps({**base, "type": "move_piece", "payload": {"piece_id": "piece-02"}}),
-        json.dumps({**base, "type": "set_phase", "payload": {"phase": "summary"}}),
-        json.dumps({**base, "type": "move_piece", "payload": move, "actor": "tutor"}),
-        json.dumps(
-            {**base, "type": "submit_answer", "payload": {"answer": 6.0, "explanation": None}}
+    answer = {"answer": 6.0, "explanation": None}
+    highlight = {**base, "type": "highlight_group", "payload": {"group_id": "group-1"}}
+    tutor_move = {**base, "type": "move_piece", "payload": move, "turn_id": "t", "turn_epoch": 0}
+    rejected = [  # (corpo cru, ator, código exato)
+        ("{not json", "learner", "INVALID_PAYLOAD"),
+        (
+            json.dumps({**base, "type": "move_piece", "payload": move, "js": "x"}),
+            "learner",
+            "INVALID_PAYLOAD",
         ),
+        (
+            json.dumps({**base, "type": "move_piece", "payload": {**move, "extra": 1}}),
+            "learner",
+            "INVALID_PAYLOAD",
+        ),
+        (
+            json.dumps({**base, "type": "move_piece", "payload": {"piece_id": "p"}}),
+            "learner",
+            "INVALID_PAYLOAD",
+        ),
+        (
+            json.dumps({**base, "type": "set_phase", "payload": {"phase": "summary"}}),
+            "learner",
+            "INVALID_PAYLOAD",
+        ),
+        (
+            json.dumps({**base, "type": "move_piece", "payload": move, "actor": "tutor"}),
+            "learner",
+            "INVALID_PAYLOAD",
+        ),
+        (
+            json.dumps({**base, "type": "submit_answer", "payload": answer}),
+            "learner",
+            "INVALID_PAYLOAD",
+        ),
+        (
+            json.dumps(highlight),
+            "learner",
+            "ACTION_NOT_ALLOWED",
+        ),  # ação do tutor, enviada pela criança
+        (json.dumps(tutor_move), "tutor", "ACTION_NOT_ALLOWED"),  # o tutor não move peça
     ]
-    for raw in bad:
+    for raw, actor, code in rejected:
         with pytest.raises(DomainError) as e:
-            parse_command(raw, "learner")
-        assert e.value.code in {"INVALID_PAYLOAD", "ACTION_NOT_ALLOWED"}, raw
-    # Ação fora da autorização do ator: o tutor não move peça.
-    with pytest.raises(DomainError) as e:
-        parse_command(
-            json.dumps(
-                {**base, "type": "move_piece", "payload": move, "turn_id": "t", "turn_epoch": 0}
-            ),
-            "tutor",
-        )
-    assert e.value.code == "ACTION_NOT_ALLOWED"
-    # Nada executou: a sessão é a mesma e a fase não mudou.
-    assert s.phase == "practice" and s == _practice_with([1, 0, 0, 0])
+            parse_command(raw, actor)
+        assert e.value.code == code, raw
+    # Nada chegou ao domínio: um comando válido na mesma sessão avança exatamente uma revisão.
+    ok = apply(s, cmd("move_piece", piece_id="piece-02", to_location="group-2"))
+    assert ok.session.revision == s.revision + 1 and ok.session.phase == s.phase == "practice"
