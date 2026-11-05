@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from app.domain.division.errors import DomainError
 from app.domain.division.task import TaskSpec
@@ -33,7 +33,7 @@ class SceneState(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     scene_id: str
-    scene_revision: int
+    scene_revision: StrictInt = Field(ge=0)
     attempt_id: str
     task: TaskSpec
     projection: Projection
@@ -42,7 +42,7 @@ class SceneState(BaseModel):
     available_piece_ids: tuple[str, ...]
     pieces: tuple[Piece, ...]
     highlighted_ids: tuple[str, ...]
-    answer_display: int | None
+    answer_display: StrictInt | None = Field(ge=0)
 
     @model_validator(mode="after")
     def _check_invariants(self) -> "SceneState":

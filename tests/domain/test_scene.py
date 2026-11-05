@@ -120,3 +120,19 @@ def test_scene_with_counts_helper():
     s = scene_with_counts(T24_4, [5, 5, 5, 5])
     assert [len(g.piece_ids) for g in s.groups] == [5, 5, 5, 5]
     assert s.available_piece_ids == ("piece-21", "piece-22", "piece-23", "piece-24")
+
+
+@pytest.mark.parametrize("field", ["scene_revision", "answer_display"])
+@pytest.mark.parametrize("bad", [True, False, 5.0, 6.5, -1, "3"])
+def test_scene_ints_are_strict_and_non_negative(field, bad):
+    d = _fixture_dict()
+    d[field] = bad
+    with pytest.raises(ValidationError):
+        SceneState.model_validate(d)
+
+
+def test_scene_ints_accept_valid_values():
+    d = _fixture_dict()
+    d["scene_revision"], d["answer_display"] = 0, 0
+    s = SceneState.model_validate(d)
+    assert s.scene_revision == 0 and s.answer_display == 0
