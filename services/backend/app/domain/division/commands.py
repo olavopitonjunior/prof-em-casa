@@ -62,10 +62,16 @@ CommandType = Literal[
     "close_session",
 ]
 
-# A Spec §3 lista só quatro valores para `request_help.kind`. Ficam de fora procedural e
-# accessibility (só o tutor registra) e também virtual_objects e reference_model, que a tabela
-# não prevê. Subconjunto de HelpKind (checado aqui e em teste).
-RequestHelpKind = Literal["prompt", "visual_hint", "worked_step", "alternate_strategy"]
+# D3 (decisão posterior do usuário, acima da tabela da Spec §3): `request_help.kind` é HelpKind
+# sem procedural e accessibility, que só o tutor registra. Subconjunto de HelpKind (assert e teste).
+RequestHelpKind = Literal[
+    "prompt",
+    "visual_hint",
+    "worked_step",
+    "alternate_strategy",
+    "virtual_objects",
+    "reference_model",
+]
 assert set(get_args(RequestHelpKind)) <= set(get_args(HelpKind))
 
 # Comandos de cena: exigem `expected_scene_revision`; os demais o proíbem.

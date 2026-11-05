@@ -170,10 +170,19 @@ def test_request_help_kind_is_subset_of_help_kind():
     kinds = set(get_args(RequestHelpKind))
     assert kinds <= set(get_args(HelpKind))
     assert not kinds & {"procedural", "accessibility"}
-    assert kinds == {"prompt", "visual_hint", "worked_step", "alternate_strategy"}
+    assert kinds == {
+        "prompt", "visual_hint", "worked_step", "alternate_strategy",
+        "virtual_objects", "reference_model",
+    }  # fmt: skip
 
 
-@pytest.mark.parametrize("kind", ["procedural", "accessibility", "virtual_objects", "x"])
+@pytest.mark.parametrize("kind", ["virtual_objects", "reference_model"])
+def test_request_help_accepts_d3_resources_for_learner(kind):
+    parsed = parse_command(cmd("request_help", payload={"kind": kind, "reason": "r"}), "learner")
+    assert parsed.payload.kind == kind
+
+
+@pytest.mark.parametrize("kind", ["procedural", "accessibility", "x"])
 def test_request_help_rejects_other_kinds(kind):
     raw = cmd("request_help", payload={"kind": kind, "reason": "r"})
     assert code_of(raw) == "INVALID_PAYLOAD"
