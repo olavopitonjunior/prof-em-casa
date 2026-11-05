@@ -12,6 +12,7 @@ import shutil
 import socket
 import subprocess
 import uuid
+import warnings
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -75,6 +76,22 @@ def _start_cluster(pg_bin: Path, data: Path, log: Path) -> int:
     raise RuntimeError(f"Postgres de teste não subiu: {started.stderr}\n{_log_tail(log)}")
 
 
+def _stop_cluster(pg_bin: Path, data: Path, log: Path) -> None:
+    """Para o cluster; se `fast` falhar, tenta `immediate`. Só avisa: nunca mascara a falha do teste."""
+    if not (data / "postmaster.pid").exists():
+        return  # nunca subiu, ou já parou
+    for mode in ("fast", "immediate"):
+        stopped = _run([str(pg_bin / "pg_ctl"), "-D", str(data), "-m", mode, "-w", "stop"])
+        if stopped.returncode == 0:
+            return
+        warnings.warn(
+            f"pg_ctl stop -m {mode} falhou ({stopped.returncode}): {stopped.stderr.strip()}\n"
+            f"{_log_tail(log)}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+
 @pytest.fixture(scope="session")
 def pg_cluster(tmp_path_factory: pytest.TempPathFactory) -> Iterator[PgCluster]:
     pg_bin = _find_pg_bin()
@@ -118,7 +135,7 @@ def pg_cluster(tmp_path_factory: pytest.TempPathFactory) -> Iterator[PgCluster]:
             admin.dispose()
         yield cluster
     finally:
-        _run([str(pg_bin / "pg_ctl"), "-D", str(data), "-m", "fast", "-w", "stop"])
+        _stop_cluster(pg_bin, data, log)
         shutil.rmtree(data, ignore_errors=True)
 
 
@@ -159,9 +176,8 @@ def engine(db_url: str) -> Iterator[Engine]:
     """Engine nos dois bancos, com o schema criado (SQLite) ou herdado do template (Postgres)."""
     eng = make_engine(db_url)
     try:
-        create_schema(
-            eng
-        )  # SQLite cria as tabelas; no Postgres o clone do template já está migrado
+        # SQLite cria as tabelas; no Postgres o clone do template já está migrado (sem efeito).
+        create_schema(eng)
         yield eng
     finally:
         eng.dispose()

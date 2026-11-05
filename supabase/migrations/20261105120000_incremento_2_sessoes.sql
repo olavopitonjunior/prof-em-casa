@@ -22,18 +22,19 @@ create table public.sessions (
 
 create table public.session_credentials (
     token_hash text primary key,
-    session_id text not null references public.sessions (session_id),
+    session_id text not null references public.sessions (session_id) on delete cascade,
     actor text not null,
     created_at timestamptz not null,
     constraint ck_session_credentials_actor check (actor = 'learner')
 );
 
 create table public.attempts (
-    session_id text not null,
+    session_id text not null references public.sessions (session_id) on delete cascade,
     attempt_id text not null,
     kind text not null,
     item_id text not null,
     status text not null,
+    outcome text,
     assistance_level text not null,
     support_resources jsonb not null,
     updated_revision integer not null,
@@ -42,7 +43,7 @@ create table public.attempts (
 
 create table public.session_events (
     event_id text primary key,
-    session_id text not null references public.sessions (session_id),
+    session_id text not null references public.sessions (session_id) on delete cascade,
     event_seq integer not null,
     revision integer not null,
     type text not null,
@@ -55,7 +56,7 @@ create table public.session_events (
 );
 
 create table public.command_results (
-    session_id text not null,
+    session_id text not null references public.sessions (session_id) on delete cascade,
     command_id text not null,
     kind text not null,
     body_hash text not null,
@@ -70,7 +71,7 @@ create table public.command_results (
 );
 
 create table public.render_receipts (
-    session_id text not null,
+    session_id text not null references public.sessions (session_id) on delete cascade,
     receipt_id text not null,
     effect_id text not null,
     command_id text not null,
@@ -85,7 +86,7 @@ create table public.render_receipts (
 
 create table public.artifacts (
     artifact_id text primary key,
-    session_id text not null references public.sessions (session_id),
+    session_id text not null references public.sessions (session_id) on delete cascade,
     attempt_id text not null,
     purpose text not null,
     version integer not null,
@@ -100,8 +101,8 @@ create table public.artifacts (
 
 create table public.analysis_jobs (
     job_id text primary key,
-    session_id text not null references public.sessions (session_id),
-    artifact_id text not null references public.artifacts (artifact_id),
+    session_id text not null references public.sessions (session_id) on delete cascade,
+    artifact_id text not null references public.artifacts (artifact_id) on delete cascade,
     request_id text not null,
     status text not null,
     executions integer not null default 0,
@@ -117,10 +118,10 @@ create table public.analysis_jobs (
 
 create table public.observations (
     observation_id text primary key,
-    job_id text not null references public.analysis_jobs (job_id),
-    session_id text not null,
+    job_id text not null references public.analysis_jobs (job_id) on delete cascade,
+    session_id text not null references public.sessions (session_id) on delete cascade,
     attempt_id text not null,
-    artifact_id text not null,
+    artifact_id text not null references public.artifacts (artifact_id) on delete cascade,
     document jsonb not null,
     created_at timestamptz not null,
     constraint uq_observations_job_id unique (job_id)

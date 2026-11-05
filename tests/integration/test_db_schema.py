@@ -13,6 +13,7 @@ from app.db.migrate import MIGRATIONS_DIR, apply_migrations
 from app.db.schema import (
     analysis_jobs,
     artifacts,
+    attempts,
     command_results,
     metadata,
     observations,
@@ -23,7 +24,7 @@ from app.db.schema import (
 )
 from app.domain.division.session import SessionState, new_session
 from helpers import cmd, practice_with_counts, run, session_in_practice, session_in_transfer
-from sqlalchemy import JSON, MetaData, UniqueConstraint, insert, select, text
+from sqlalchemy import JSON, MetaData, UniqueConstraint, delete, func, insert, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError, StatementError
 from sqlalchemy.pool import StaticPool
 
@@ -145,6 +146,7 @@ def _foreign_keys(table):
             frozenset(c.name for c in fk.columns),
             fk.elements[0].column.table.name,
             frozenset(e.column.name for e in fk.elements),
+            fk.ondelete,
         )
         for fk in table.foreign_key_constraints
     }
@@ -217,6 +219,65 @@ def _job_row(job_id="j1", **over):
     return row | over
 
 
+def _attempt_row(session_id="s1", **over):
+    row = {
+        "session_id": session_id,
+        "attempt_id": "att-1",
+        "kind": "practice",
+        "item_id": "task-1",
+        "status": "active",
+        "outcome": None,
+        "assistance_level": "none",
+        "support_resources": [],
+        "updated_revision": 0,
+    }
+    return row | over
+
+
+def _result_row(session_id="s1", **over):
+    row = {
+        "session_id": session_id,
+        "command_id": "c1",
+        "kind": "command",
+        "body_hash": "h",
+        "actor": "learner",
+        "principal_id": "p",
+        "http_status": 200,
+        "response": {},
+        "revision": 1,
+        "created_at": T0,
+    }
+    return row | over
+
+
+def _receipt_row(session_id="s1", **over):
+    row = {
+        "session_id": session_id,
+        "receipt_id": "r1",
+        "effect_id": "e1",
+        "command_id": "c1",
+        "scene_revision": 0,
+        "connection_generation": 1,
+        "status": "ok",
+        "outcome": "accepted",
+        "received_at": T0,
+    }
+    return row | over
+
+
+def _observation_row(session_id="s1", **over):
+    row = {
+        "observation_id": "o1",
+        "job_id": "j1",
+        "session_id": session_id,
+        "attempt_id": "att-1",
+        "artifact_id": "a1",
+        "document": {"groups": []},
+        "created_at": T0,
+    }
+    return row | over
+
+
 def _seed(conn, *, artifact=False, job=False):
     conn.execute(insert(sessions).values(_session_row()))
     if artifact or job:
@@ -274,10 +335,9 @@ def test_apply_migrations_applies_only_new_files_in_order(pg_engine, tmp_path):
             .scalars()
             .all()
         )
-    assert versions[0].startswith("20261105120000") and versions[1:] == [
-        "20270101000000_a",
-        "20270101000001_b",
-    ]
+    assert versions == sorted(versions)
+    assert versions[0] == "20261105120000_incremento_2_sessoes"
+    assert versions[-2:] == ["20270101000000_a", "20270101000001_b"]
 
 
 def test_failed_migration_is_atomic(pg_engine, tmp_path):
@@ -288,7 +348,9 @@ def test_failed_migration_is_atomic(pg_engine, tmp_path):
     with pg_engine.connect() as conn:
         assert conn.execute(text("select to_regclass('public.zz_ok')")).scalar() is None
         assert conn.execute(text("select to_regclass('public.zz_bad')")).scalar() is None
-    assert [p.stem for p in MIGRATIONS_DIR.glob("*.sql")] == ["20261105120000_incremento_2_sessoes"]
+    stems = [p.stem for p in sorted(MIGRATIONS_DIR.glob("*.sql"))]
+    assert stems[0] == "20261105120000_incremento_2_sessoes"
+    assert stems == sorted(stems)
 
 
 def test_rls_enabled_on_every_table(pg_engine):
@@ -390,8 +452,8 @@ CHECK_CASES = {
             "received_at": T0,
         },
     ),
-    "purpose de artefato": (artifacts, _artifact_row(purpose="outro")),
-    "version de artefato": (artifacts, _artifact_row(version=0)),
+    "purpose de artefato": (artifacts, _artifact_row("a-purpose", purpose="outro")),
+    "version de artefato": (artifacts, _artifact_row("a-version", version=0)),
     "status de job": (analysis_jobs, _job_row(status="done")),
 }
 
@@ -413,6 +475,87 @@ def test_foreign_keys_are_enforced(engine):
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(insert(sessions).values(_session_row()))
         conn.execute(insert(analysis_jobs).values(_job_row(artifact_id="inexistente")))
+
+
+ORPHANS = {
+    "attempts": (attempts, _attempt_row("sem-sessao")),
+    "command_results": (command_results, _result_row("sem-sessao")),
+    "render_receipts": (render_receipts, _receipt_row("sem-sessao")),
+    "observations.session_id": (observations, _observation_row("sem-sessao")),
+    "observations.artifact_id": (observations, _observation_row(artifact_id="inexistente")),
+}
+
+
+@pytest.mark.parametrize("case", ORPHANS)
+def test_session_scoped_tables_reject_orphans(engine, case):
+    table, row = ORPHANS[case]
+    with engine.begin() as conn:
+        _seed(conn, job=True)  # s1, a1 e j1 existem: só a coluna do caso aponta para o vazio
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(insert(table).values(row))
+
+
+def test_deleting_a_session_cascades_to_everything_it_owns(engine):
+    children = [
+        session_credentials,
+        attempts,
+        session_events,
+        command_results,
+        render_receipts,
+        artifacts,
+        analysis_jobs,
+        observations,
+    ]
+    with engine.begin() as conn:
+        _seed(conn, job=True)
+        conn.execute(insert(sessions).values(_session_row("s2", "req-2")))
+        conn.execute(
+            insert(session_credentials).values(
+                token_hash="t1", session_id="s1", actor="learner", created_at=T0
+            )
+        )
+        conn.execute(insert(attempts).values(_attempt_row()))
+        conn.execute(insert(session_events).values(_event_row("s1", 1)))
+        conn.execute(insert(command_results).values(_result_row()))
+        conn.execute(insert(render_receipts).values(_receipt_row()))
+        conn.execute(insert(observations).values(_observation_row()))
+        conn.execute(insert(attempts).values(_attempt_row("s2")))  # sobrevive
+        for table in children:
+            assert conn.execute(select(func.count()).select_from(table)).scalar() >= 1, table.name
+    with engine.begin() as conn:
+        conn.execute(delete(sessions).where(sessions.c.session_id == "s1"))
+    with engine.connect() as conn:
+        counts = {
+            t.name: conn.execute(select(func.count()).select_from(t)).scalar() for t in children
+        }
+        left = conn.execute(select(sessions.c.session_id)).scalars().all()
+    assert counts == {t.name: 0 for t in children} | {"attempts": 1}
+    assert left == ["s2"]
+
+
+def test_deleting_an_artifact_cascades_to_its_observations_and_jobs(engine):
+    with engine.begin() as conn:
+        _seed(conn, job=True)
+        conn.execute(insert(observations).values(_observation_row()))
+    with engine.begin() as conn:
+        conn.execute(delete(artifacts).where(artifacts.c.artifact_id == "a1"))
+    with engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(observations)).scalar() == 0
+        assert conn.execute(select(func.count()).select_from(analysis_jobs)).scalar() == 0
+        assert conn.execute(select(func.count()).select_from(sessions)).scalar() == 1
+
+
+def test_attempt_outcome_is_nullable_and_stored(engine):
+    with engine.begin() as conn:
+        _seed(conn)
+        conn.execute(insert(attempts).values(_attempt_row()))
+        conn.execute(
+            insert(attempts).values(
+                _attempt_row(attempt_id="att-2", outcome="applied_without_item_help")
+            )
+        )
+        rows = conn.execute(select(attempts.c.attempt_id, attempts.c.outcome)).all()
+    assert dict(rows) == {"att-1": None, "att-2": "applied_without_item_help"}
 
 
 def test_artifact_version_is_unique_per_attempt_and_purpose(engine):

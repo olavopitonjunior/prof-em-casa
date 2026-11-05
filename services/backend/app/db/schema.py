@@ -90,7 +90,9 @@ session_credentials = Table(
     "session_credentials",
     metadata,
     Column("token_hash", Text, primary_key=True),
-    Column("session_id", Text, ForeignKey("sessions.session_id"), nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("actor", Text, nullable=False),
     Column("created_at", UtcDateTime, nullable=False),
     CheckConstraint("actor = 'learner'", name="ck_session_credentials_actor"),
@@ -99,11 +101,14 @@ session_credentials = Table(
 attempts = Table(
     "attempts",
     metadata,
-    Column("session_id", Text, nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("attempt_id", Text, nullable=False),
     Column("kind", Text, nullable=False),
-    Column("item_id", Text, nullable=False),
+    Column("item_id", Text, nullable=False),  # o task_id da Spec Parte II §9
     Column("status", Text, nullable=False),
+    Column("outcome", Text, nullable=True),  # o "resultado" da tentativa (Spec Parte II §9)
     Column("assistance_level", Text, nullable=False),
     Column("support_resources", _json(), nullable=False),
     Column("updated_revision", Integer, nullable=False),
@@ -114,7 +119,9 @@ session_events = Table(
     "session_events",
     metadata,
     Column("event_id", Text, primary_key=True),
-    Column("session_id", Text, ForeignKey("sessions.session_id"), nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("event_seq", Integer, nullable=False),
     Column("revision", Integer, nullable=False),
     Column("type", Text, nullable=False),
@@ -129,7 +136,9 @@ session_events = Table(
 command_results = Table(
     "command_results",
     metadata,
-    Column("session_id", Text, nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("command_id", Text, nullable=False),
     Column("kind", Text, nullable=False),
     Column("body_hash", Text, nullable=False),
@@ -146,7 +155,9 @@ command_results = Table(
 render_receipts = Table(
     "render_receipts",
     metadata,
-    Column("session_id", Text, nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("receipt_id", Text, nullable=False),
     Column("effect_id", Text, nullable=False),
     Column("command_id", Text, nullable=False),
@@ -163,7 +174,9 @@ artifacts = Table(
     "artifacts",
     metadata,
     Column("artifact_id", Text, primary_key=True),
-    Column("session_id", Text, ForeignKey("sessions.session_id"), nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("attempt_id", Text, nullable=False),
     Column("purpose", Text, nullable=False),
     Column("version", Integer, nullable=False),
@@ -186,8 +199,12 @@ analysis_jobs = Table(
     "analysis_jobs",
     metadata,
     Column("job_id", Text, primary_key=True),
-    Column("session_id", Text, ForeignKey("sessions.session_id"), nullable=False),
-    Column("artifact_id", Text, ForeignKey("artifacts.artifact_id"), nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
+    Column(
+        "artifact_id", Text, ForeignKey("artifacts.artifact_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("request_id", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("executions", Integer, nullable=False, server_default=text("0")),
@@ -206,10 +223,14 @@ observations = Table(
     "observations",
     metadata,
     Column("observation_id", Text, primary_key=True),
-    Column("job_id", Text, ForeignKey("analysis_jobs.job_id"), nullable=False),
-    Column("session_id", Text, nullable=False),
+    Column("job_id", Text, ForeignKey("analysis_jobs.job_id", ondelete="CASCADE"), nullable=False),
+    Column(
+        "session_id", Text, ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("attempt_id", Text, nullable=False),
-    Column("artifact_id", Text, nullable=False),
+    Column(
+        "artifact_id", Text, ForeignKey("artifacts.artifact_id", ondelete="CASCADE"), nullable=False
+    ),
     Column("document", _json(), nullable=False),
     Column("created_at", UtcDateTime, nullable=False),
     UniqueConstraint("job_id", name="uq_observations_job_id"),
