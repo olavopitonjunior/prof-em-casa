@@ -13,11 +13,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
-from sqlalchemy import Connection, insert, select, update
+from sqlalchemy import Connection, func, insert, select, update
 
 from app.db.schema import (
+    analysis_jobs,
+    artifacts,
     attempts,
     command_results,
+    observations,
     render_receipts,
     session_credentials,
     session_events,
@@ -413,3 +416,179 @@ def insert_result(
             created_at=now,
         )
     )
+
+
+# --- artefatos, jobs de análise e observações ----------------------------------------------------
+
+# Jobs que ainda podem receber ou reconciliar um resultado: o `applied` marca a aplicação.
+_OPEN_JOB_STATUSES = ("queued", "running", "ready", "needs_clarification")
+
+
+@dataclass(frozen=True)
+class JobRow:
+    job_id: str
+    session_id: str
+    artifact_id: str
+    artifact_version: int
+    attempt_id: str
+    status: str
+    applied: bool
+
+
+def next_artifact_version(
+    conn: Connection, session_id: str, attempt_id: str, purpose: str = "notebook"
+) -> int:
+    """`1 + max(version)` por `(session_id, attempt_id, purpose)`. Chamado com a sessão travada."""
+    highest = conn.execute(
+        select(func.max(artifacts.c.version)).where(
+            artifacts.c.session_id == session_id,
+            artifacts.c.attempt_id == attempt_id,
+            artifacts.c.purpose == purpose,
+        )
+    ).scalar_one()
+    return 1 + (highest or 0)
+
+
+def insert_artifact(
+    conn: Connection,
+    *,
+    artifact_id: str,
+    session_id: str,
+    attempt_id: str,
+    purpose: str,
+    version: int,
+    expires_at: datetime,
+    now: datetime,
+) -> None:
+    """No incremento 2 não há armazenamento de objeto: `object_key` e `content_hash` ficam nulos."""
+    conn.execute(
+        insert(artifacts).values(
+            artifact_id=artifact_id,
+            session_id=session_id,
+            attempt_id=attempt_id,
+            purpose=purpose,
+            version=version,
+            content_hash=None,
+            object_key=None,
+            created_at=now,
+            expires_at=expires_at,
+        )
+    )
+
+
+def insert_job(
+    conn: Connection,
+    *,
+    job_id: str,
+    session_id: str,
+    artifact_id: str,
+    request_id: str,
+    now: datetime,
+) -> None:
+    conn.execute(
+        insert(analysis_jobs).values(
+            job_id=job_id,
+            session_id=session_id,
+            artifact_id=artifact_id,
+            request_id=request_id,
+            status="queued",
+            executions=0,
+            applied=False,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+
+def find_job(conn: Connection, job_id: str) -> JobRow | None:
+    found = conn.execute(
+        select(
+            analysis_jobs.c.job_id,
+            analysis_jobs.c.session_id,
+            analysis_jobs.c.artifact_id,
+            analysis_jobs.c.status,
+            analysis_jobs.c.applied,
+            artifacts.c.version,
+            artifacts.c.attempt_id,
+        )
+        .select_from(
+            analysis_jobs.join(artifacts, artifacts.c.artifact_id == analysis_jobs.c.artifact_id)
+        )
+        .where(analysis_jobs.c.job_id == job_id)
+    ).one_or_none()
+    if found is None:
+        return None
+    return JobRow(
+        job_id=found.job_id,
+        session_id=found.session_id,
+        artifact_id=found.artifact_id,
+        artifact_version=found.version,
+        attempt_id=found.attempt_id,
+        status=found.status,
+        applied=bool(found.applied),
+    )
+
+
+def update_job(
+    conn: Connection,
+    job_id: str,
+    *,
+    status: str,
+    applied: bool,
+    now: datetime,
+    count_execution: bool = False,
+) -> None:
+    values: dict[str, Any] = {"status": status, "applied": applied, "updated_at": now}
+    if count_execution:
+        values["executions"] = analysis_jobs.c.executions + 1
+    conn.execute(update(analysis_jobs).where(analysis_jobs.c.job_id == job_id).values(**values))
+
+
+def supersede_jobs(
+    conn: Connection, session_id: str, job_ids: Sequence[str], *, now: datetime
+) -> None:
+    """Marca como `superseded` os jobs abertos e ainda não aplicados (inclusive os adiados)."""
+    if not job_ids:
+        return
+    conn.execute(
+        update(analysis_jobs)
+        .where(
+            analysis_jobs.c.session_id == session_id,
+            analysis_jobs.c.job_id.in_(list(job_ids)),
+            analysis_jobs.c.status.in_(_OPEN_JOB_STATUSES),
+            analysis_jobs.c.applied.is_(False),
+        )
+        .values(status="superseded", updated_at=now)
+    )
+
+
+def insert_observation(
+    conn: Connection,
+    *,
+    observation_id: str,
+    job_id: str,
+    session_id: str,
+    attempt_id: str,
+    artifact_id: str,
+    document: dict[str, Any],
+    now: datetime,
+) -> None:
+    """Só a observação estruturada (R28): nenhum texto livre da criança existe aqui."""
+    conn.execute(
+        insert(observations).values(
+            observation_id=observation_id,
+            job_id=job_id,
+            session_id=session_id,
+            attempt_id=attempt_id,
+            artifact_id=artifact_id,
+            document=document,
+            created_at=now,
+        )
+    )
+
+
+def load_observation_document(conn: Connection, job_id: str) -> dict[str, Any] | None:
+    found = conn.execute(
+        select(observations.c.document).where(observations.c.job_id == job_id)
+    ).scalar_one_or_none()
+    return None if found is None else dict(found)
