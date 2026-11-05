@@ -233,18 +233,29 @@ def submitted(s: SessionState, artifact_id: str, version: int, job_id: str) -> S
     ).session
 
 
+GUIDED_ID = "attempt-2-guided"  # demonstração é attempt-1; a guiada, attempt-2
+
+
 def in_review() -> SessionState:
     """Foto 1 enviada (art-1 v1, job-1): fase notebook_review, análise pendente."""
-    return submitted(in_notebook_capture(), "art-1", 1, "job-1")
+    s = submitted(in_notebook_capture(), "art-1", 1, "job-1")
+    assert s.active_attempt_id == GUIDED_ID
+    return s
 
 
 def result_for(job_id: str, artifact_id: str, version: int, *, attempt_id=None, obs=None):
+    """Resultado coerente: a observação leva os mesmos ids do resultado (R24)."""
     from app.domain.division.analysis import AnalysisResult
 
+    attempt_id = attempt_id or GUIDED_ID
+    base = (obs or load_obs("observacao-5-5-5-5")).model_dump(mode="json")
+    observation = NotebookObservation.model_validate(
+        {**base, "artifact_id": artifact_id, "attempt_id": attempt_id, "artifact_version": version}
+    )
     return AnalysisResult(
         job_id=job_id,
         artifact_id=artifact_id,
         artifact_version=version,
-        attempt_id=attempt_id or "attempt-2-guided",
-        observation=obs or load_obs("observacao-5-5-5-5"),
+        attempt_id=attempt_id,
+        observation=observation,
     )

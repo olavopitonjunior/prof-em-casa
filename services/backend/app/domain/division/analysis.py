@@ -7,12 +7,18 @@ funções puras, o estado de entrada nunca é alterado e um `DomainError` não d
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from app.content.loader import ContentPackage
 from app.domain.division.errors import DomainError
 from app.domain.division.observation import NotebookObservation, verify_observation
-from app.domain.division.state import ActiveArtifact, CommandResult, DomainEvent, SessionState
+from app.domain.division.state import (
+    ActiveArtifact,
+    CommandResult,
+    DomainEvent,
+    SessionState,
+    drop_artifact,
+)
 
 __all__ = [
     "AnalysisApplication",
@@ -22,7 +28,12 @@ __all__ = [
     "submit_artifact",
 ]
 
-Disposition = Literal["applied", "superseded", "deferred", "discarded"]
+Disposition = Literal["applied", "already_applied", "superseded", "deferred", "discarded"]
+
+# Fases em que um resultado vigente ainda tem onde ser aplicado: a revisão e, enquanto a criança
+# revisa o registro (revise_record), o caderno. Spec §8: "reconciliar ... na fase notebook_review".
+# `source_review` é da análise da fonte, que não usa `active_artifact`.
+_ANALYSIS_PHASES = frozenset({"notebook_review", "notebook"})
 
 
 class AnalysisResult(BaseModel):
@@ -42,6 +53,12 @@ class AnalysisApplication(BaseModel):
 
     disposition: Disposition
     result: CommandResult | None = None
+
+    @model_validator(mode="after")
+    def _result_only_when_applied(self) -> "AnalysisApplication":
+        if (self.disposition == "applied") != (self.result is not None):
+            raise ValueError("result exists exactly when the disposition is applied")
+        return self
 
 
 def _finish(session: SessionState, events: list[DomainEvent], *, bump_revision: bool):
@@ -70,7 +87,9 @@ def submit_artifact(
     artifact = ActiveArtifact(
         artifact_id=artifact_id, artifact_version=artifact_version, job_id=job_id
     )
-    events = [
+    # Normalmente já foi abandonado por open_notebook_capture; defensivo contra estado herdado.
+    session, events = drop_artifact(session, reason="replaced", clear_completed=True)
+    events.append(
         DomainEvent(
             type="artifact_submitted",
             attempt_id=attempt_id,
@@ -80,11 +99,8 @@ def submit_artifact(
                 "job_id": job_id,
             },
         )
-    ]
-    # Uma foto nova invalida o que a anterior produziu: a análise volta a "pending".
-    updated = session.with_changes(
-        phase="notebook_review", active_artifact=artifact, observation=None, verification=None
     )
+    updated = session.with_changes(phase="notebook_review", active_artifact=artifact)
     return CommandResult(
         session=_finish(updated, events, bump_revision=True),
         events=tuple(events),
@@ -93,14 +109,30 @@ def submit_artifact(
 
 
 def _is_current(session: SessionState, result: AnalysisResult) -> bool:
+    """O resultado é do artefato vigente, da tentativa ainda ativa, e a fase espera análise."""
     artifact = session.active_artifact
+    attempt = session.active_attempt
     return (
-        result.attempt_id == session.active_attempt_id
-        and artifact is not None
+        artifact is not None
+        and attempt is not None
+        and attempt.status == "active"
+        and result.attempt_id == attempt.attempt_id
         and result.artifact_id == artifact.artifact_id
         and result.job_id == artifact.job_id
         and result.artifact_version == artifact.artifact_version
+        and session.phase in _ANALYSIS_PHASES
     )
+
+
+def _check_coherent(result: AnalysisResult) -> None:
+    """R24: a observação tem de ser do artefato e da tentativa que o resultado declara."""
+    obs = result.observation
+    if (obs.artifact_id, obs.artifact_version, obs.attempt_id) != (
+        result.artifact_id,
+        result.artifact_version,
+        result.attempt_id,
+    ):
+        raise DomainError("INVALID_PAYLOAD", "observation does not belong to the result")
 
 
 def apply_analysis_result(
@@ -110,15 +142,16 @@ def apply_analysis_result(
     content: ContentPackage,
     bump_revision: bool = True,
 ) -> AnalysisApplication:
+    _check_coherent(result)
     if session.session_status == "closed":
         return AnalysisApplication(disposition="discarded")
-    if not _is_current(session, result):
+    attempt = session.active_attempt
+    if attempt is None or not _is_current(session, result):
         return AnalysisApplication(disposition="superseded")
+    if session.observation is not None:  # um job produz uma análise: a segunda entrega não vale
+        return AnalysisApplication(disposition="already_applied")
     if session.session_status == "paused":
         return AnalysisApplication(disposition="deferred")
-    attempt = session.active_attempt
-    if attempt is None:  # inalcançável: _is_current exige attempt_id == active_attempt_id
-        return AnalysisApplication(disposition="superseded")
     item = content.items[attempt.item_id]
     verification = verify_observation(item.task, item.private.quotient, result.observation, [])
     events = [

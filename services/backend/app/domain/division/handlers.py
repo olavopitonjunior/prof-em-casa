@@ -1,4 +1,5 @@
-"""Handlers dos comandos executáveis (incremento 1, mais o fluxo de captura do caderno) (regra (6) da ordem de guardas).
+"""Handlers dos comandos executáveis (regra (6) da ordem de guardas): incremento 1 mais o fluxo
+de captura do caderno.
 
 Cada handler recebe um `Ctx` e devolve um `Outcome`: o novo estado SEM fase, revisões nem
 `last_event_seq` (o `apply_command` completa isso), os eventos e se a cena mudou. Handlers nunca
@@ -21,7 +22,7 @@ from app.domain.division.demonstration import apply_demo_step, completed_rounds,
 from app.domain.division.distribution import select_initial_intervention, verify_distribution
 from app.domain.division.errors import DomainError
 from app.domain.division.scene import SceneState, initial_scene, move_piece
-from app.domain.division.state import Attempt, DomainEvent, SessionState
+from app.domain.division.state import Attempt, DomainEvent, SessionState, drop_artifact
 from app.domain.division.transitions import AttemptKind, NextPhaseFacts, next_phase
 
 
@@ -324,30 +325,21 @@ def return_to_activity(ctx: Ctx) -> Outcome:
 
 
 def open_notebook_capture(ctx: Ctx) -> Outcome:
-    """notebook -> notebook_capture (a fase vem da tabela). Sem evento: nada foi enviado ainda."""
-    return Outcome(ctx.session)
+    """notebook -> notebook_capture (a fase vem da tabela). Uma foto nova (R23) abandona o artefato
+    anterior, que pode existir depois de `revise_record`."""
+    updated, events = drop_artifact(ctx.session, reason="recapture", clear_completed=True)
+    return Outcome(updated, events)
 
 
 def cancel_capture(ctx: Ctx) -> Outcome:
-    """notebook_capture -> notebook. Mantém o checkpoint e o artefato anterior, se houver."""
+    """notebook_capture -> notebook. Mantém o checkpoint; em captura não há artefato vigente."""
     return Outcome(ctx.session)
 
 
 def retake_notebook_photo(ctx: Ctx) -> Outcome:
-    """notebook_review -> notebook_capture. A análise da foto descartada deixa de valer."""
-    s = ctx.session
-    events: list[DomainEvent] = []
-    if s.active_artifact is not None:
-        events.append(
-            _event(
-                "analysis_superseded",
-                s.active_attempt_id,
-                artifact_id=s.active_artifact.artifact_id,
-                job_id=s.active_artifact.job_id,
-                reason="retake",
-            )
-        )
-    updated = s.with_changes(active_artifact=None, observation=None, verification=None)
+    """notebook_review -> notebook_capture. A foto descartada deixa de valer (R26: um evento só se
+    a análise ainda estava pendente)."""
+    updated, events = drop_artifact(ctx.session, reason="retake", clear_completed=True)
     return Outcome(updated, events)
 
 
@@ -392,16 +384,15 @@ def continue_after_explanation(ctx: Ctx) -> Outcome:
         interaction_mode="ready", return_phase=None, notebook_intent=None
     )
     if attempt.kind != "guided":
-        return Outcome(updated, events)
-    transfer, _ = _start_attempt(s, "transfer", _item_by_role(ctx.content, "transfer"))
+        # Análise ainda pendente não terá mais onde ser aplicada; a já concluída fica como evidência.
+        updated, dropped = drop_artifact(updated, reason="attempt_closed", clear_completed=False)
+        return Outcome(updated, [*events, *dropped])
     # A foto do caderno pertence à tentativa guiada: não passa para a questão nova.
+    updated, dropped = drop_artifact(updated, reason="attempt_changed", clear_completed=True)
+    events += dropped
+    transfer, _ = _start_attempt(s, "transfer", _item_by_role(ctx.content, "transfer"))
     updated = updated.with_changes(
-        attempts=(*updated.attempts, transfer),
-        active_attempt_id=transfer.attempt_id,
-        scene=None,
-        active_artifact=None,
-        observation=None,
-        verification=None,
+        attempts=(*updated.attempts, transfer), active_attempt_id=transfer.attempt_id, scene=None
     )
     events += [
         _event("attempt_started", transfer.attempt_id, kind="transfer", item_id=transfer.item_id),

@@ -10,6 +10,7 @@ from app.domain.division.errors import DomainError
 from app.domain.division.session import SessionState, public_snapshot
 from helpers import (
     CONTENT,
+    GUIDED_ID,
     apply,
     cmd,
     in_notebook_capture,
@@ -19,6 +20,7 @@ from helpers import (
     result_for,
     run,
     session_in_practice,
+    session_in_transfer,
     submitted,
 )
 
@@ -100,18 +102,32 @@ def test_submit_while_paused_is_accepted_and_keeps_the_pause():
     assert r.session.session_status == "paused" and r.session.phase == "notebook_review"
 
 
-def test_retake_supersedes_and_clears_observation():
-    s = apply_analysis_result(in_review(), result_for("job-1", "art-1", 1), content=CONTENT)
-    reviewed = s.result.session
-    assert reviewed.observation is not None and reviewed.verification is not None
-    r = apply(reviewed, cmd("retake_notebook_photo"))
+def test_retake_of_a_pending_analysis_emits_one_superseded_and_clears():
+    review = in_review()
+    r = apply(review, cmd("retake_notebook_photo"))
     assert r.session.phase == "notebook_capture"
     assert [e.type for e in r.events] == ["analysis_superseded"]
     assert r.events[0].data == {"artifact_id": "art-1", "job_id": "job-1", "reason": "retake"}
     assert r.session.active_artifact is None
     assert r.session.observation is None and r.session.verification is None
+    assert r.session.revision == review.revision + 1
+    assert r.session.last_event_seq == review.last_event_seq + 1
+
+
+def test_retake_after_the_analysis_completed_clears_without_an_event():  # R26
+    reviewed = _reviewed()
+    assert reviewed.observation is not None and reviewed.verification is not None
+    r = apply(reviewed, cmd("retake_notebook_photo"))
+    assert r.session.phase == "notebook_capture" and r.events == ()
+    assert r.session.active_artifact is None
+    assert r.session.observation is None and r.session.verification is None
     assert r.session.revision == reviewed.revision + 1
-    assert r.session.last_event_seq == reviewed.last_event_seq + 1
+    assert r.session.last_event_seq == reviewed.last_event_seq
+
+
+def _reviewed():
+    app = apply_analysis_result(in_review(), result_for("job-1", "art-1", 1), content=CONTENT)
+    return app.result.session
 
 
 def test_retake_without_active_artifact_emits_nothing():
@@ -308,6 +324,230 @@ def test_analysis_result_rejects_unknown_fields_and_bad_version():
         AnalysisResult.model_validate({**base, "extra": 1})
     with pytest.raises(ValueError):
         AnalysisResult.model_validate({**base, "artifact_version": 0})
+
+
+# --- R23/R26: abandonar um artefato pendente emite exatamente um analysis_superseded -----------
+
+
+def _revising_pending():
+    """Foto enviada, análise ainda pendente; a criança volta ao caderno (revise_record)."""
+    return run(in_review(), cmd("enter_notebook", intent="revise_record"))
+
+
+def test_r23_recapture_after_revise_supersedes_a_pending_artifact():
+    revising = _revising_pending()
+    assert revising.phase == "notebook" and revising.active_artifact is not None
+    r = apply(revising, cmd("open_notebook_capture"))
+    assert r.session.phase == "notebook_capture"
+    assert [e.type for e in r.events] == ["analysis_superseded"]
+    assert r.events[0].data == {"artifact_id": "art-1", "job_id": "job-1", "reason": "recapture"}
+    assert r.session.active_artifact is None
+    assert r.session.observation is None and r.session.verification is None
+    assert r.session.last_event_seq == revising.last_event_seq + 1
+
+
+@pytest.mark.ac("AC-33")
+def test_r23_late_result_for_the_recaptured_artifact_is_superseded():
+    recaptured = run(_revising_pending(), cmd("open_notebook_capture"))
+    late = result_for("job-1", "art-1", 1)
+    assert apply_analysis_result(recaptured, late, content=CONTENT).disposition == "superseded"
+    v2 = submitted(recaptured, "art-2", 2, "job-2")
+    app = apply_analysis_result(v2, late, content=CONTENT)
+    assert app.disposition == "superseded" and app.result is None
+
+
+def test_r23_recapture_after_the_analysis_completed_clears_without_an_event():
+    reviewed = run(_reviewed(), cmd("enter_notebook", intent="revise_record"))
+    assert reviewed.observation is not None
+    r = apply(reviewed, cmd("open_notebook_capture"))
+    assert r.events == ()
+    assert r.session.active_artifact is None and r.session.observation is None
+    assert r.session.verification is None
+
+
+def test_cancel_capture_after_recapture_has_no_artifact_to_lose():
+    capture = run(_revising_pending(), cmd("open_notebook_capture"))
+    back = apply(capture, cmd("cancel_capture"))
+    assert back.events == () and back.session.active_artifact is None
+
+
+def test_submit_over_a_leftover_artifact_supersedes_it():
+    leftover = in_notebook_capture().with_changes(
+        active_artifact={"artifact_id": "old", "artifact_version": 1, "job_id": "job-old"}
+    )
+    r = _submit(leftover)
+    assert [e.type for e in r.events] == ["analysis_superseded", "artifact_submitted"]
+    assert r.events[0].data == {"artifact_id": "old", "job_id": "job-old", "reason": "replaced"}
+    assert r.session.last_event_seq == leftover.last_event_seq + 2
+
+
+def _transfer_with_photo(*, analyzed: bool):
+    """Tentativa nova (transfer) com foto enviada; a criança revisa, volta e responde."""
+    s = run(session_in_transfer(), cmd("enter_notebook", intent="record_solution"))
+    s = run(s, cmd("open_notebook_capture"))
+    s = submitted(s, "art-t", 1, "job-t")
+    if analyzed:
+        s = apply_analysis_result(
+            s, result_for("job-t", "art-t", 1, attempt_id=s.active_attempt_id), content=CONTENT
+        ).result.session
+    s = run(s, cmd("enter_notebook", intent="revise_record"))
+    s = run(s, cmd("return_to_activity"))
+    assert s.phase == "transfer"
+    return run(s, cmd("submit_answer", answer=4))
+
+
+def test_guided_to_transfer_supersedes_a_pending_artifact_once():
+    s = run(in_review(), cmd("enter_notebook", intent="revise_record"))
+    s = run(s, cmd("return_to_activity"))
+    s = run(s, cmd("submit_answer", answer=6))
+    r = apply(s, cmd("continue_after_explanation", reason="learner_skipped"))
+    types = [e.type for e in r.events]
+    assert types == ["attempt_evaluated", "analysis_superseded", "attempt_started", "scene_changed"]
+    assert r.events[1].data == {
+        "artifact_id": "art-1",
+        "job_id": "job-1",
+        "reason": "attempt_changed",
+    }
+    assert r.events[1].attempt_id == GUIDED_ID
+    assert r.session.active_artifact is None
+
+
+def test_transfer_to_summary_supersedes_a_pending_artifact():
+    s = _transfer_with_photo(analyzed=False)
+    r = apply(s, cmd("continue_after_explanation", reason="learner_skipped"))
+    assert r.session.phase == "summary"
+    assert [e.type for e in r.events] == ["attempt_evaluated", "analysis_superseded"]
+    assert r.events[1].data["reason"] == "attempt_closed"
+    assert r.session.active_artifact is None
+    late = result_for("job-t", "art-t", 1, attempt_id=s.active_attempt_id)
+    assert apply_analysis_result(r.session, late, content=CONTENT).disposition == "superseded"
+
+
+def test_transfer_to_summary_keeps_a_completed_analysis_without_an_event():
+    s = _transfer_with_photo(analyzed=True)
+    r = apply(s, cmd("continue_after_explanation", reason="learner_skipped"))
+    assert [e.type for e in r.events] == ["attempt_evaluated"]
+    assert r.session.observation is not None and r.session.active_artifact is not None
+
+
+# --- result só vale na tentativa ativa e numa fase que espera análise -------------------------
+
+
+@pytest.mark.ac("AC-33")
+def test_result_with_matching_artifact_but_another_attempt_is_superseded():
+    review = in_review()
+    app = apply_analysis_result(
+        review, result_for("job-1", "art-1", 1, attempt_id="attempt-9-guided"), content=CONTENT
+    )
+    assert app.disposition == "superseded" and app.result is None
+
+
+def test_result_for_a_closed_attempt_is_superseded():
+    review = in_review()
+    closed = review.attempts[1].with_changes(status="closed")
+    s = review.with_changes(attempts=(review.attempts[0], closed, *review.attempts[2:]))
+    assert s.active_attempt_id == GUIDED_ID and s.session_status == "active"
+    app = apply_analysis_result(s, result_for("job-1", "art-1", 1), content=CONTENT)
+    assert app.disposition == "superseded" and app.result is None
+
+
+@pytest.mark.parametrize(
+    "phase", ["correction", "summary", "practice", "transfer", "notebook_capture", "explanation"]
+)
+def test_result_outside_the_awaiting_phases_is_superseded(phase):
+    s = in_review().with_changes(phase=phase)
+    app = apply_analysis_result(s, result_for("job-1", "art-1", 1), content=CONTENT)
+    assert app.disposition == "superseded" and app.result is None
+
+
+def test_result_in_the_notebook_phase_is_still_applied_while_the_child_revises():
+    app = apply_analysis_result(
+        _revising_pending(), result_for("job-1", "art-1", 1), content=CONTENT
+    )
+    assert app.disposition == "applied" and app.result.session.phase == "notebook"
+
+
+def test_late_result_after_the_transfer_attempt_ended_in_summary_is_superseded():
+    s = _transfer_with_photo(analyzed=False)
+    ended = apply(s, cmd("continue_after_explanation", reason="learner_skipped")).session
+    assert ended.phase == "summary" and ended.active_attempt.status == "closed"
+    late = result_for("job-t", "art-t", 1, attempt_id=s.active_attempt_id)
+    assert apply_analysis_result(ended, late, content=CONTENT).disposition == "superseded"
+
+
+# --- duplicata -----------------------------------------------------------------------------
+
+
+def test_second_delivery_of_the_same_result_is_a_no_op():
+    first = apply_analysis_result(in_review(), result_for("job-1", "art-1", 1), content=CONTENT)
+    done = first.result.session
+    again = apply_analysis_result(done, result_for("job-1", "art-1", 1), content=CONTENT)
+    assert again.disposition == "already_applied" and again.result is None
+    assert done.revision == first.result.session.revision  # nada mudou
+
+
+def test_a_different_observation_for_an_analyzed_artifact_does_not_overwrite_it():
+    done = _reviewed()
+    other = result_for("job-1", "art-1", 1, obs=load_obs("observacao-ambigua"))
+    again = apply_analysis_result(done, other, content=CONTENT)
+    assert again.disposition == "already_applied" and again.result is None
+
+
+def test_already_applied_still_loses_to_closed_and_superseded():
+    done = _reviewed()
+    stale = result_for("job-9", "art-9", 1)
+    assert apply_analysis_result(done, stale, content=CONTENT).disposition == "superseded"
+    closed = _closed(done)
+    assert (
+        apply_analysis_result(closed, result_for("job-1", "art-1", 1), content=CONTENT).disposition
+        == "discarded"
+    )
+
+
+# --- R24: a observação tem de ser do resultado -------------------------------------------------
+
+
+def _result_with_observation(**obs_over):
+    r = result_for("job-1", "art-1", 1)
+    obs = type(r.observation).model_validate({**r.observation.model_dump(mode="json"), **obs_over})
+    return AnalysisResult(**{**dict(r), "observation": obs})
+
+
+@pytest.mark.parametrize(
+    "over",
+    [{"artifact_id": "art-2"}, {"attempt_id": "attempt-9-guided"}, {"artifact_version": 2}],
+)
+def test_r24_observation_must_match_the_result(over):
+    result = _result_with_observation(**over)
+    assert _code(apply_analysis_result, in_review(), result, content=CONTENT) == "INVALID_PAYLOAD"
+
+
+def test_r24_mismatch_is_invalid_even_when_the_result_is_stale():
+    result = _result_with_observation(artifact_id="art-2")
+    stale = _paused(in_review().with_changes(active_artifact=None))
+    assert _code(apply_analysis_result, stale, result, content=CONTENT) == "INVALID_PAYLOAD"
+
+
+def test_state_rejects_an_observation_without_artifact():
+    done = _reviewed()
+    with pytest.raises(ValueError):
+        done.with_changes(active_artifact=None)
+    with pytest.raises(ValueError):
+        done.with_changes(verification=None)
+
+
+def test_application_disposition_and_result_must_agree():
+    from app.domain.division.analysis import AnalysisApplication
+
+    with pytest.raises(ValueError):
+        AnalysisApplication(disposition="applied")
+    with pytest.raises(ValueError):
+        AnalysisApplication(disposition="superseded", result=_reviewed_result())
+
+
+def _reviewed_result():
+    app = apply_analysis_result(in_review(), result_for("job-1", "art-1", 1), content=CONTENT)
+    return app.result
 
 
 # --- restrição global ---------------------------------------------------------------------------

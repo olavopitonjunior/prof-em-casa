@@ -105,6 +105,16 @@ class SessionState(_Frozen):
             raise ValueError("at most one active attempt")
         if self.scene is not None and self.scene.scene_revision > self.scene_revision:
             raise ValueError("scene is newer than the session scene_revision")
+        if self.observation is not None and self.active_artifact is None:
+            raise ValueError("observation requires an active artifact")
+        if (self.verification is None) != (self.observation is None):
+            raise ValueError("observation and verification come together")
+        if (
+            self.verification is not None
+            and self.observation is not None
+            and self.verification.observation_id != self.observation.observation_id
+        ):
+            raise ValueError("verification is of another observation")
         return self
 
     @property
@@ -142,3 +152,31 @@ def new_session(session_id: str) -> SessionState:
         scene=None,
         last_event_seq=0,
     )
+
+
+def drop_artifact(
+    session: SessionState, *, reason: str, clear_completed: bool
+) -> tuple[SessionState, list[DomainEvent]]:
+    """Abandona o artefato vigente (R23/R26). Se a análise ainda está pendente, emite exatamente um
+    `analysis_superseded`; se já terminou, não há evento. `clear_completed=False` preserva a
+    observação já aplicada (a evidência continua valendo)."""
+    artifact = session.active_artifact
+    if artifact is None:
+        return session, []
+    pending = session.observation is None
+    events: list[DomainEvent] = []
+    if pending:
+        events.append(
+            DomainEvent(
+                type="analysis_superseded",
+                attempt_id=session.active_attempt_id,
+                data={
+                    "artifact_id": artifact.artifact_id,
+                    "job_id": artifact.job_id,
+                    "reason": reason,
+                },
+            )
+        )
+    if not (pending or clear_completed):
+        return session, events
+    return session.with_changes(active_artifact=None, observation=None, verification=None), events
