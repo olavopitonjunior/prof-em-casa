@@ -78,6 +78,10 @@ def apply_command(
         raise DomainError("ACTION_NOT_ALLOWED", f"{actor} cannot run {ctype}")
     if command.session_id != session.session_id:
         raise DomainError("INVALID_PAYLOAD", "session_id mismatch")
+    # R30: turno antigo do tutor não causa efeito. Vem antes de qualquer outra regra, então a
+    # recusa não depende (nem revela) o resto do estado. `parse_command` já exige o campo do tutor.
+    if actor == "tutor" and command.turn_epoch != session.turn_epoch:
+        raise DomainError("STALE_TURN", f"current turn_epoch is {session.turn_epoch}")
     # (1) sessão fechada
     if session.session_status == "closed":
         raise DomainError("ACTION_NOT_ALLOWED", "session_closed")

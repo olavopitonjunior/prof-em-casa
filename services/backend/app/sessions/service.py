@@ -8,6 +8,7 @@ aqui ficam a transação, a trava da linha da sessão e a gravação.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 from collections.abc import Mapping
@@ -37,6 +38,20 @@ _REQUEST_ID_RE = re.compile(r"[A-Za-z0-9_-]{22,128}")
 MAX_EVENTS_PAGE = 1000
 # NUL e substitutos soltos não existem em texto Unicode válido e o JSONB do Postgres os recusa.
 _BAD_TEXT_RE = re.compile("[\x00\ud800-\udfff]")
+
+
+MAX_BEARER_LENGTH = 512
+
+
+def _same_controller(presented: str | None, current: str) -> bool:
+    """Compara o `X-Controller-Id` com o vigente em tempo constante. Texto que não é UTF-8
+    válido (substituto solto) simplesmente não é o controlador."""
+    if presented is None:
+        return False
+    try:
+        return hmac.compare_digest(presented.encode("utf-8"), current.encode("utf-8"))
+    except UnicodeEncodeError:
+        return False
 
 
 @dataclass(frozen=True)
@@ -119,8 +134,8 @@ class SessionService:
         Token de serviço alcança todas as sessões (`session_id=None`). Token de sessão alcança só a
         sua e é sempre o aluno; `controller_id` é o cabeçalho `X-Controller-Id` (decisão P3).
         """
-        if not bearer:
-            raise SessionError("UNAUTHENTICATED")
+        if not bearer or len(bearer) > MAX_BEARER_LENGTH or _BAD_TEXT_RE.search(bearer):
+            raise SessionError("UNAUTHENTICATED")  # lixo nunca chega ao hash nem ao banco
         service_actor = match_service_token(bearer, self._service_hashes)
         if service_actor is not None:
             return ActorContext(service_actor, f"{service_actor}-service", None, None)
@@ -154,12 +169,16 @@ class SessionService:
             if existing is not None:
                 row = repository.load_session(conn, existing, for_update=False)
                 assert row is not None  # a chave estrangeira garante; o CASCADE apaga os dois
-                # O controle original é o próprio request_id. Nunca devolve o controlador
-                # vigente: quem repete o POST não herda um controle tomado depois.
+                # Sem troca de controle (geração 1), devolve o id original: quem perdeu a
+                # resposta se recupera. Depois de uma troca devolve um id novo que não controla
+                # nada, para que o replay nunca entregue o controlador vigente.
+                controller_id = (
+                    row.controller_id if row.connection_generation == 1 else self._ids("ctl")
+                )
                 return CreatedSession(
                     session_id=existing,
                     session_token=token,
-                    controller_id=request_id,
+                    controller_id=controller_id,
                     connection_generation=row.connection_generation,
                     snapshot=session_view(
                         row.state,
@@ -169,10 +188,13 @@ class SessionService:
                     replay=True,
                 )
             state = new_session(self._ids("ses"))
+            # O controlador da primeira aba é um id aleatório do servidor, independente do
+            # request_id (de onde sai o token): vazar o cabeçalho X-Controller-Id não revela o token.
+            controller_id = self._ids("ctl")
             row = SessionRow(
                 state=state,
                 connection_generation=1,
-                controller_id=request_id,
+                controller_id=controller_id,
                 expires_at=now + self._ttl,
             )
             repository.insert_session(
@@ -185,7 +207,7 @@ class SessionService:
         return CreatedSession(
             session_id=state.session_id,
             session_token=token,
-            controller_id=request_id,
+            controller_id=controller_id,
             connection_generation=1,
             snapshot=session_view(state, self.content, connection_generation=1),
             replay=False,
@@ -489,7 +511,11 @@ class SessionService:
     def _authorize(self, ctx: ActorContext, row: SessionRow | None, *, write: bool) -> None:
         if row is None or row.expires_at <= self._clock():
             raise SessionError("NOT_FOUND")  # decisão P11: expirada é igual a inexistente
-        if write and ctx.actor == "learner" and ctx.controller_id != row.controller_id:
+        if (
+            write
+            and ctx.actor == "learner"
+            and not _same_controller(ctx.controller_id, row.controller_id)
+        ):
             raise SessionError("CONTROL_LOST")  # decisão P3
 
     @staticmethod

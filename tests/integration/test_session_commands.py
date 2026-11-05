@@ -150,7 +150,7 @@ def run_parallel(n: int, fn):
 def test_create_session_returns_snapshot_and_credentials(svc):
     created = svc.create_session(request_id(1), VERSION)
     assert not created.replay
-    assert created.controller_id == request_id(1) and created.connection_generation == 1
+    assert created.controller_id != request_id(1) and created.connection_generation == 1
     assert created.session_token == derive_session_token(TOKEN_SECRET, request_id(1))
     assert created.snapshot["session_id"] == created.session_id
     assert created.snapshot["revision"] == 0 and created.snapshot["connection_generation"] == 1
@@ -189,7 +189,13 @@ def test_create_session_replay_does_not_hand_over_a_taken_control(svc):
             .values(controller_id="someone-else-entirely", connection_generation=2)
         )
     again = svc.create_session(request_id(1), VERSION)
-    assert again.controller_id == request_id(1) and again.snapshot["connection_generation"] == 2
+    # Quem repete o POST depois de uma troca de controle recebe um id que não controla nada.
+    assert again.snapshot["connection_generation"] == 2
+    assert again.controller_id not in {
+        request_id(1),
+        "someone-else-entirely",
+        created.controller_id,
+    }
 
 
 @pytest.mark.parametrize(

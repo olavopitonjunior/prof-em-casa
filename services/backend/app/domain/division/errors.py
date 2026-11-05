@@ -1,6 +1,7 @@
 from typing import Literal
 
-# Códigos de erro da Spec, Parte II §8 "Erros".
+# Códigos de erro da Spec, Parte II §8 "Erros", mais `STALE_TURN` (extensão R30: a Spec exige
+# recusar turno antigo do tutor, mas não nomeia o código).
 ErrorCode = Literal[
     "INVALID_PAYLOAD",
     "UNAUTHENTICATED",
@@ -9,6 +10,7 @@ ErrorCode = Literal[
     "NOT_FOUND",
     "STALE_REVISION",
     "STALE_SCENE",
+    "STALE_TURN",
     "ATTEMPT_CHANGED",
     "IDEMPOTENCY_CONFLICT",
     "INVALID_TRANSITION",

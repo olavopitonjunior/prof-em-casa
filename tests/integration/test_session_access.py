@@ -105,7 +105,10 @@ def test_session_token_authenticates_the_learner_of_that_session(svc):
     assert svc.authenticate(created.session_token, None).controller_id is None
 
 
-@pytest.mark.parametrize("bearer", [None, "", "not-a-known-token", "x" * 500])
+@pytest.mark.parametrize(
+    "bearer",
+    [None, "", "not-a-known-token", "x" * 500, "x" * 100_000, "\ud800", "ab\udfffcd", "a\x00b"],
+)
 def test_unknown_and_missing_token_unauthenticated(svc, bearer):
     svc.create_session(request_id(1), VERSION)
     with pytest.raises(SessionError) as e:
@@ -162,6 +165,138 @@ def test_tutor_scene_command_reaches_the_domain(svc, two_tabs):
     with pytest.raises(SessionError) as e:
         svc.execute_command(tutor, sid, json.dumps(body).encode())
     assert (e.value.code, e.value.detail) == ("ACTION_NOT_ALLOWED", "not_in_increment_1")
+
+
+def test_bearer_with_invalid_characters_is_unauthenticated_not_an_exception(svc):
+    for bearer in ("\ud800", "tok\udc00en", "tok\x00en", "é" * 40):
+        with pytest.raises(SessionError) as e:
+            svc.authenticate(bearer, "any")
+        assert e.value.code == "UNAUTHENTICATED"
+
+
+@pytest.mark.parametrize("header", ["\ud800", "tab\x00b", "é-aba", "x" * 10_000])
+def test_odd_controller_header_loses_control_without_crashing(svc, two_tabs, header):
+    _, _, sid = two_tabs
+    ctx = ActorContext("learner", sid, sid, header)
+    with pytest.raises(SessionError) as e:
+        send(svc, ctx, sid, cmd("pause_session"))
+    assert e.value.code == "CONTROL_LOST"
+    assert svc.get_snapshot(ctx, sid)["session_id"] == sid
+
+
+def test_first_controller_id_is_independent_of_the_request_id(svc):
+    rid = request_id(1)
+    created = svc.create_session(rid, VERSION)
+    token = created.session_token
+    assert created.controller_id not in (rid, token)
+    assert rid not in created.controller_id and token not in created.controller_id
+    assert svc.create_session(request_id(2), VERSION).controller_id != created.controller_id
+    with svc.engine.connect() as conn:
+        stored = conn.execute(
+            select(sessions.c.controller_id).where(sessions.c.session_id == created.session_id)
+        ).scalar_one()
+    assert stored == created.controller_id  # o aluno da primeira aba escreve com ele
+    ctx = svc.authenticate(token, created.controller_id)
+    assert send(svc, ctx, created.session_id, cmd("choose_reference_activity")).status_code == 200
+
+
+def test_post_sessions_replay_reveals_no_more_than_the_original(svc):
+    created = svc.create_session(request_id(1), VERSION)
+    again = svc.create_session(request_id(1), VERSION)
+    # Sem troca de controle: o mesmo id da resposta original (quem perdeu a resposta se recupera).
+    assert again.replay and again.controller_id == created.controller_id
+    # Com troca: o replay não entrega o controlador vigente nem o original.
+    tab_b = ActorContext("learner", created.session_id, created.session_id, RID_B)
+    svc.claim_control(tab_b, created.session_id, request_id=RID_B, expected_revision=0)
+    late = svc.create_session(request_id(1), VERSION)
+    assert late.controller_id not in {created.controller_id, RID_B, request_id(1)}
+    ctx = svc.authenticate(late.session_token, late.controller_id)
+    with pytest.raises(SessionError) as e:
+        send(svc, ctx, created.session_id, cmd("choose_reference_activity"))
+    assert e.value.code == "CONTROL_LOST"
+    # ...e nunca expõe o controlador vigente, nem no snapshot.
+    assert RID_B not in json.dumps(late.snapshot)
+
+
+# --- R30: turno antigo do tutor -----------------------------------------------------------------
+
+
+def in_demonstration(svc):
+    """Sessão em demonstração (o tutor age aqui), com a aba A e a aba B."""
+    created = svc.create_session(request_id(1), VERSION)
+    sid = created.session_id
+    tab_a = svc.authenticate(created.session_token, created.controller_id)
+    tab_b = ActorContext("learner", sid, sid, RID_B)
+    send(svc, tab_a, sid, cmd("choose_reference_activity"))
+    return tab_a, tab_b, sid
+
+
+def tutor_step(svc, sid, n, **over):
+    return body_of(
+        state_of(svc, sid),
+        cmd("run_demo_step", actor="tutor", step_id=demo_steps(T12_4, 3)[n].step_id),
+        **over,
+    )
+
+
+def snapshot_of_effects(svc, sid):
+    state = state_of(svc, sid)
+    return state.model_dump(mode="json"), len(event_rows(svc.engine, sid))
+
+
+def test_claim_control_cuts_off_the_tutor_turn_in_flight(svc):
+    _, tab_b, sid = in_demonstration(svc)
+    tutor = svc.authenticate(FAKE_TUTOR_TOKEN, None)
+    old_epoch = state_of(svc, sid).turn_epoch
+    # O tutor planejou o turno com a época vigente; antes de enviar, a aba B assume o controle.
+    stale_body = tutor_step(svc, sid, 0, turn_epoch=old_epoch)
+    svc.claim_control(tab_b, sid, request_id=RID_B, expected_revision=revisions(svc, sid)[0])
+    assert state_of(svc, sid).turn_epoch == old_epoch + 1
+    before = snapshot_of_effects(svc, sid)
+    stale_body = json.dumps({**json.loads(stale_body), "expected_revision": before[0]["revision"]})
+    with pytest.raises(SessionError) as e:
+        svc.execute_command(tutor, sid, stale_body.encode())
+    assert e.value.code == "STALE_TURN"
+    assert snapshot_of_effects(svc, sid) == before  # sem efeito, sem evento, sem revisão
+    # A mesma ordem com a época nova é aceita.
+    fresh = tutor_step(svc, sid, 0, turn_epoch=old_epoch + 1)
+    out = svc.execute_command(tutor, sid, fresh)
+    assert out.status_code == 200 and out.body["revision"] == before[0]["revision"] + 1
+
+
+def test_a_rejected_stale_turn_does_not_take_the_command_id(svc):
+    _, tab_b, sid = in_demonstration(svc)
+    tutor = svc.authenticate(FAKE_TUTOR_TOKEN, None)
+    stale = tutor_step(svc, sid, 0, turn_epoch=0, command_id="tutor-cmd-1")
+    svc.claim_control(tab_b, sid, request_id=RID_B, expected_revision=revisions(svc, sid)[0])
+    stale = json.loads(stale) | {"expected_revision": revisions(svc, sid)[0]}
+    with pytest.raises(SessionError) as e:
+        svc.execute_command(tutor, sid, json.dumps(stale).encode())
+    assert e.value.code == "STALE_TURN"
+    fixed = stale | {"turn_epoch": state_of(svc, sid).turn_epoch}
+    assert svc.execute_command(tutor, sid, json.dumps(fixed).encode()).status_code == 200
+
+
+def test_learner_commands_ignore_the_turn_epoch_rule(svc):
+    _, tab_b, sid = in_demonstration(svc)
+    svc.claim_control(tab_b, sid, request_id=RID_B, expected_revision=revisions(svc, sid)[0])
+    assert state_of(svc, sid).turn_epoch == 1
+    # O aluno (aba B, a vigente) segue agindo sem enviar turn_epoch.
+    assert send(svc, tab_b, sid, cmd("pause_session")).status_code == 200
+    assert send(svc, tab_b, sid, cmd("resume_session")).status_code == 200
+
+
+def test_pause_also_invalidates_the_tutor_turn(svc):
+    tab_a, _, sid = in_demonstration(svc)
+    tutor = svc.authenticate(FAKE_TUTOR_TOKEN, None)
+    epoch = state_of(svc, sid).turn_epoch
+    send(svc, tab_a, sid, cmd("pause_session"))
+    send(svc, tab_a, sid, cmd("resume_session"))
+    with pytest.raises(SessionError) as e:
+        svc.execute_command(tutor, sid, tutor_step(svc, sid, 0, turn_epoch=epoch))
+    assert e.value.code == "STALE_TURN"
+    ok = svc.execute_command(tutor, sid, tutor_step(svc, sid, 0, turn_epoch=epoch + 1))
+    assert ok.status_code == 200
 
 
 # --- AC-38: segunda aba assume o controle ---------------------------------------------------------

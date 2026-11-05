@@ -152,6 +152,36 @@ def test_run_demo_step_by_tutor_emits_events():
     assert r.events[0].data["round_completed"] is True
 
 
+# --- R30: turno antigo do tutor não causa efeito -----------------------------------------------
+
+
+def test_tutor_command_with_stale_turn_epoch_is_rejected():
+    s = session_after_demo_steps(3).with_changes(turn_epoch=2)
+    for old in (0, 1, 3):
+        e = _code(s, cmd("run_demo_step", actor="tutor", step_id="r1-g4", turn_epoch=old))
+        assert e.code == "STALE_TURN" and "2" in (e.detail or "")
+    ok = apply(s, cmd("run_demo_step", actor="tutor", step_id="r1-g4", turn_epoch=2))
+    assert ok.session.revision == s.revision + 1
+
+
+def test_stale_turn_is_checked_before_any_other_rule():
+    s = session_after_demo_steps(3).with_changes(turn_epoch=2)
+    # revisão velha também: a recusa de turno vem antes e não revela nada do resto
+    stale_both = cmd(
+        "run_demo_step", actor="tutor", step_id="r1-g4", turn_epoch=1, expected_revision=0
+    )
+    assert _code(s, stale_both).code == "STALE_TURN"
+
+
+def test_stale_turn_rule_does_not_touch_learner_or_system_commands():
+    s = session_after_demo_steps(3).with_changes(turn_epoch=5)
+    assert apply(s, cmd("run_demo_step", actor="system", step_id="r1-g4")).session.revision == (
+        s.revision + 1
+    )
+    p = session_in_practice().with_changes(turn_epoch=5)
+    assert apply(p, cmd("check_distribution")).session.revision == p.revision + 1
+
+
 # --- AC-05 / AC-06 ----------------------------------------------------------------------------
 
 
