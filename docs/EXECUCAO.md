@@ -18,15 +18,15 @@ documento não afirma ganho de aprendizagem.
 | Python | 3.12.14 (`uv run python -V`) |
 | Sistema operacional | macOS 26.6.2 (build 25G83), arm64 |
 | Ferramentas | uv 0.12.5, pytest 9.2.0 |
-| Código sob teste | branch `feat/incremento-1-dominio`, a partir do commit `2d432ac` (Task 8) |
+| Código sob teste | branch `feat/incremento-1-dominio`, commit de código `fa34945` (base `457cb8c`); o commit seguinte altera só este registro |
 | Data | 2026-11-05 |
 
 ## Comandos e resultado
 
 | Comando | Resultado |
 |---|---|
-| `uv run pytest -q` | 476 passed |
-| `uv run pytest -q -m ac -rA` | 45 passed, 431 deselected; os 10 ACs com teste marcado e aprovado |
+| `uv run pytest -q` | 505 passed |
+| `uv run pytest -q -m ac -rA` | 45 passed, 460 deselected; os 10 ACs com teste marcado e aprovado |
 | `uv run ruff check .` | All checks passed |
 
 ## Como a rastreabilidade funciona
@@ -53,7 +53,7 @@ documento não afirma ganho de aprendizagem.
 | AC-05 | `test_ac05_unequal_practice_detects_inequality_without_acting` | `[7,5,6,6]`: detecta desigualdade, escolhe `compare_groups`, não move peça nem marca domínio |
 | AC-06 | `test_ac06_equal_groups_with_available_pieces_ask_about_the_total` | `[5,5,5,5]` com 4 disponíveis: grupos iguais, total incompleto, `check_total_use`, sem "resto" |
 | AC-21 | `test_ac21_new_question_starts_clean` | 20 ÷ 5 sem cena, sem resposta, sem ajuda prévia, projeção pública sem quociente |
-| AC-22 | `test_ac22_correct_answer_with_sufficient_explanation_and_paper_is_without_item_help` | `applied_without_item_help` com recurso `paper` no registro e nível `none`; resumo sem alegar domínio nem retenção |
+| AC-22 | `test_ac22_correct_answer_with_sufficient_explanation_and_paper_is_without_item_help` | `applied_without_item_help` com recurso `paper` no registro e nível `none`. Não comprovado aqui: o resumo "sem alegar domínio nem retenção", pois este incremento ainda não tem resumo |
 | AC-23 | `test_ac23_bare_answer_is_partial_evidence_and_never_sufficient_alone` | resposta isolada fica `answer_correct_evidence_partial` |
 | AC-24 | `test_ac24_help_is_recorded_before_the_resource_and_marks_support` | ajuda registrada antes da cena; resultado `applied_with_support` |
 | AC-27 | `test_ac27_rejected_commands_leave_no_partial_mutation` | revisão velha, tentativa trocada, cena velha, origem da peça incorreta: erro e sessão intacta |
