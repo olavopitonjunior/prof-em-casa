@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pytest
@@ -14,32 +13,12 @@ from app.domain.division.observation import (
 )
 from app.domain.division.scene import SceneState
 from app.domain.division.task import TaskSpec
-from helpers import T24_4
+from helpers import T24_4, load_obs, load_raw, obs_with
 from pydantic import ValidationError
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 ids = {"scene_id": "scene-guided-001", "attempt_id": "attempt-guided-001", "scene_revision": 9}
 T20_5 = TaskSpec(dividend=20, divisor=5, unit="peças")
-
-
-def load_raw(name: str) -> dict:
-    return json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
-
-
-def load_obs(name: str) -> NotebookObservation:
-    return NotebookObservation.model_validate(load_raw(name))
-
-
-def obs_with(base: str = "observacao-5-5-5-5", *, counts=None, **expression) -> NotebookObservation:
-    raw = load_raw(base)
-    if counts is not None:
-        template = raw["groups"][0]
-        raw["groups"] = [
-            {**template, "group_id": f"photo-group-{i + 1}", "count": c}
-            for i, c in enumerate(counts)
-        ]
-    raw["expression"].update(expression)
-    return NotebookObservation.model_validate(raw)
 
 
 def _pieces(scene: SceneState, group_id: str):

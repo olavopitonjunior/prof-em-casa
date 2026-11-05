@@ -65,6 +65,18 @@ def evaluate_artifact_explanation(task: TaskSpec, verification: Verification) ->
             )
         if verification.status == "inconclusive":
             return result("unclear", "desenho ainda não pôde ser lido com segurança")
+        total = facts.get("represented_total")
+        if (
+            facts.get("task_groups") == len(counts)
+            and facts.get("groups_equal") is True
+            and _is_int(total)
+            and total == facts.get("task_total")
+        ):  # desenho correto; só a expressão/resposta escrita diverge
+            return result(
+                "unclear",
+                f"desenho mostra {len(counts)} grupos de {counts[0]} = {total}, "
+                "mas a resposta ou expressão escrita não confere",
+            )
         return result("unclear", "desenho não mostra grupos iguais que somem o total")
 
     # Sem grupos: só a expressão. Parcial se ela é consistente com a tarefa.

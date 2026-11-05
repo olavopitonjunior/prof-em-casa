@@ -7,9 +7,8 @@ from app.domain.division.classification import (
 )
 from app.domain.division.observation import NotebookObservation, verify_observation
 from app.domain.division.task import TaskSpec
-from helpers import T24_4
+from helpers import T24_4, load_obs, load_raw, obs_with
 from pydantic import ValidationError
-from test_observation import load_obs, load_raw, obs_with
 
 S = ExplanationResult(rating="sufficient", modality="text", evidence="5 grupos de 4 = 20")
 P = ExplanationResult(rating="partial", modality="text", evidence="falou só o total")
@@ -133,7 +132,17 @@ def test_artifact_explanation_wrong_drawing_is_unclear_without_leaking_quotient(
     assert v.status == "inconsistent"
     result = evaluate_artifact_explanation(T24_4, v)
     assert result.rating == "unclear"
-    assert "6" not in result.evidence
+    assert result.evidence == "desenho não mostra grupos iguais que somem o total"
+
+
+def test_artifact_explanation_correct_drawing_with_wrong_written_answer_is_faithful():
+    v = verify_observation(T24_4, 6, obs_with(counts=[6, 6, 6, 6], answer=5), [])
+    assert v.status == "inconsistent" and v.issues == ("WRITTEN_ANSWER_MISMATCH",)
+    result = evaluate_artifact_explanation(T24_4, v)
+    assert result.rating == "unclear"
+    assert result.evidence == (
+        "desenho mostra 4 grupos de 6 = 24, mas a resposta ou expressão escrita não confere"
+    )
 
 
 def test_artifact_explanation_expression_only_is_partial():
@@ -149,7 +158,7 @@ def test_artifact_explanation_expression_only_wrong_answer_is_unclear_and_does_n
     assert "WRITTEN_ANSWER_MISMATCH" in v.issues
     result = evaluate_artifact_explanation(T24_4, v)
     assert result.rating == "unclear"
-    assert "6" not in result.evidence
+    assert result.evidence == "expressão escrita não confere com a tarefa"
 
 
 def test_artifact_explanation_expression_mismatch_is_unclear():
