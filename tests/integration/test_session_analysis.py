@@ -6,10 +6,13 @@ As jornadas são montadas por comandos reais pelo serviço (nenhum atalho de est
 
 import json
 import uuid
+from datetime import timedelta
 
 import pytest
 from app.db.schema import analysis_jobs, artifacts, command_results, observations
+from app.domain.division.errors import DomainError
 from app.domain.division.observation import NotebookObservation
+from app.sessions import service as service_module
 from app.sessions.context import ActorContext
 from app.sessions.errors import SessionError
 from conftest import SYSTEM, body_of, dump_tables, event_rows, send, start_practice, state_of
@@ -171,6 +174,8 @@ def test_ac37_paused_keeps_result_until_resume(svc):
     out = send(svc, ctx, sid, cmd("resume_session"))
     assert out.body["revision"] == r_paused + 1  # uma revisão (P7)
     assert last_event_types(svc, sid, 2) == ["session_resumed", "analysis_completed"]
+    # quem concluiu a análise foi o worker de visão; a retomada foi do aluno
+    assert [e["actor"] for e in event_rows(svc.engine, sid)[-2:]] == ["learner", "vision_worker"]
     assert state_of(svc, sid).revision == r_paused + 1
     assert out.body["event_seq"] == state_of(svc, sid).last_event_seq
     events = event_rows(svc.engine, sid)[-2:]
@@ -180,6 +185,23 @@ def test_ac37_paused_keeps_result_until_resume(svc):
     assert job_row(svc, sub["job_id"])["applied"] is True
     # a retomada não reaplica nada: um segundo resultado do mesmo job é a disposição anterior
     assert svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub)) == "applied"
+
+
+def test_resume_reconciliation_domain_error_is_a_session_error_without_effect(svc, monkeypatch):
+    ctx, sid = to_capture(svc)
+    sub = submit(svc, ctx, sid, "up-1")
+    send(svc, ctx, sid, cmd("pause_session"))
+    assert svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub)) == "deferred"
+    before = dump_tables(svc.engine, sid)
+
+    def boom(*args, **kwargs):
+        raise DomainError("INVALID_TRANSITION", "reconciliation refused")
+
+    monkeypatch.setattr(service_module, "apply_analysis_result", boom)
+    with pytest.raises(SessionError) as e:
+        send(svc, ctx, sid, cmd("resume_session"), command_id="c-resume")
+    assert e.value.code == "INVALID_TRANSITION" and e.value.command_id == "c-resume"
+    assert dump_tables(svc.engine, sid) == before
 
 
 def test_resume_without_pending_result_changes_nothing_else(svc):
@@ -201,12 +223,44 @@ def test_ac37_closed_session_ignores_late_result(svc):
     before = dump_tables(svc.engine, sid)
     revision = state_of(svc, sid).revision
 
+    # o fechamento já encerrou o job (terminal), e o resultado tardio nem é gravado
+    job = job_row(svc, sub["job_id"])
+    assert job["status"] == "superseded" and job["applied"] is False
     assert svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub)) == "discarded"
     assert dump_tables(svc.engine, sid) == before  # revisão e eventos iguais
     assert state_of(svc, sid).revision == revision
-    job = job_row(svc, sub["job_id"])
-    assert job["status"] == "ready" and job["applied"] is False
+    assert count(svc, observations, sid) == 0
     assert svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub)) == "discarded"
+
+
+def test_closing_ends_a_deferred_ready_job_too(svc):
+    ctx, sid = to_capture(svc)
+    sub = submit(svc, ctx, sid, "up-1")
+    send(svc, ctx, sid, cmd("pause_session"))
+    assert svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub)) == "deferred"
+    assert job_status(svc, sub["job_id"]) == "ready"
+    send(svc, ctx, sid, cmd("close_session", reason="learner_stopped"))
+    job = job_row(svc, sub["job_id"])
+    assert job["status"] == "superseded" and job["applied"] is False
+    assert svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub)) == "discarded"
+
+
+def test_an_expired_session_ends_its_open_jobs(svc, clock):
+    ctx, sid = to_capture(svc)
+    sub = submit(svc, ctx, sid, "up-1")
+    assert job_status(svc, sub["job_id"]) == "queued"
+    clock.advance(timedelta(hours=24, seconds=1))
+    before = dump_tables(svc.engine, sid)
+    with pytest.raises(SessionError) as e:  # o worker segue recebendo 404...
+        svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub))
+    assert e.value.code == "NOT_FOUND"
+    # ...mas o job deixa de ficar `queued` para sempre, e a observação tardia não é gravada
+    job = job_row(svc, sub["job_id"])
+    assert job["status"] == "superseded" and job["applied"] is False
+    assert count(svc, observations, sid) == 0
+    assert dump_tables(svc.engine, sid) == before
+    with pytest.raises(SessionError):
+        svc.complete_analysis(WORKER, sub["job_id"], obs_of(svc, sid, sub))
 
 
 @pytest.mark.ac("AC-37")

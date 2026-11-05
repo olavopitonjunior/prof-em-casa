@@ -1427,7 +1427,9 @@
               "SESSION_LIMIT",
               "PROVIDER_UNAVAILABLE",
               "PAYLOAD_TOO_LARGE",
-              "INTERNAL_ERROR"
+              "INTERNAL_ERROR",
+              "METHOD_NOT_ALLOWED",
+              "UNSUPPORTED_MEDIA_TYPE"
             ],
             "title": "Code",
             "type": "string"
@@ -3955,7 +3957,7 @@
                 }
               }
             },
-            "description": "UNSUPPORTED_IMAGE"
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
           },
           "422": {
             "content": {
@@ -4136,7 +4138,7 @@
                 }
               }
             },
-            "description": "UNSUPPORTED_IMAGE"
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
           },
           "422": {
             "content": {
@@ -4454,7 +4456,7 @@
                 }
               }
             },
-            "description": "UNSUPPORTED_IMAGE"
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
           },
           "422": {
             "content": {
@@ -4519,6 +4521,7 @@
             "required": false,
             "schema": {
               "default": 0,
+              "maximum": 2147483647,
               "minimum": 0,
               "title": "After Seq",
               "type": "integer"
@@ -4636,7 +4639,7 @@
                 }
               }
             },
-            "description": "UNSUPPORTED_IMAGE"
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
           },
           "422": {
             "content": {
@@ -4817,7 +4820,7 @@
                 }
               }
             },
-            "description": "UNSUPPORTED_IMAGE"
+            "description": "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)"
           },
           "422": {
             "content": {

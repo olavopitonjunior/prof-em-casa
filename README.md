@@ -21,7 +21,7 @@ Muitas crianças não conseguem fazer a lição de casa sem um adulto ao lado: n
 | Incremento | Conteúdo | Estado |
 |---|---|---|
 | 1 | Conteúdo, tipos e regras pedagógicas (domínio puro) | pronto, 505 testes |
-| 2 | Sessão persistida, comandos autorizados, retomada | pronto no backend, 1118 testes na suíte completa; aguarda revisão |
+| 2 | Sessão persistida, comandos autorizados, retomada | pronto no backend, 1152 testes na suíte completa; aguarda revisão |
 | 3 | Cena 3D/2D, gestos, demonstração | planejado |
 | 4 | Captura e análise real da foto do caderno | planejado |
 | 5 | Tutor por voz/texto | planejado |
@@ -60,6 +60,8 @@ Com o ambiente carregado (por exemplo `set -a; source .env; set +a`), suba o ser
 ```bash
 uv run uvicorn app.api.app:get_app --factory --app-dir services/backend
 ```
+
+Uma sessão expira em 24 h; repetir `POST /v1/sessions` com o mesmo `request_id` depois disso responde 404, então o cliente usa um `request_id` novo para abrir outra sessão. Os comandos exigem `Content-Type: application/json` (415 caso contrário).
 
 O contrato fica em `contracts/openapi.json`, e o servidor também o serve em `/docs`. O avaliador de explicação por texto ainda não existe: o comando `submit_explanation` responde 503 (`PROVIDER_UNAVAILABLE`) até o incremento 5.
 

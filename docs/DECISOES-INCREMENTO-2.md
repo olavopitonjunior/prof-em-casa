@@ -56,7 +56,7 @@ A Spec é ambígua nestes pontos, e o plano decidiu cada um. A ledger da execuç
   - `_Revision` ganha teto `le=2_147_483_647` (INTEGER do Postgres).
   - **Custo se errado:** trocar 1 código de erro.
 
-## Decisões tomadas durante a execução (R19–R31)
+## Decisões tomadas durante a execução (R19–R37)
 
 Copiadas da ledger da execução (`.superpowers/sdd/2026-11-05-incremento-2-sessao/progress.md`, linhas "Ruling"; a pasta `.superpowers/` está no `.gitignore`, então a ledger existe só na máquina de execução). R19 aparece aqui e de novo na seção seguinte, porque depende de uma decisão do usuário.
 
@@ -72,8 +72,16 @@ Copiadas da ledger da execução (`.superpowers/sdd/2026-11-05-incremento-2-sess
 - R28: texto livre da criança (request_help.reason) NÃO é persistido nem emitido em eventos (AC-45: sem nomes/transcrição) — help_granted leva só has_reason: bool; texto fica efêmero para o tutor (inc. 4+). Custo se errado: perder contexto do pedido em auditoria.
 - R29: erro HTTP para audiência learner leva só code (+ campos estruturais), nunca detail textual do domínio ("explanation is not sufficient" = oráculo de rating) — Task 7. Custo se errado: mensagens de erro menos úteis no front.
 - R30: comando de tutor com turn_epoch ≠ state.turn_epoch é rejeitado (código da Spec) — sem isso claim-control não corta turno velho; entra no fix da Task 5. Custo se errado: rejeitar fala legítima após corrida.
-- : STALE_TURN é extensão da Spec (sem código próprio) — Task 7 mapeia para 409 e o catálogo de erros em DECISOES-INCREMENTO-2 registra — custo se errado: renomear um código.
+- R30 (extensão): STALE_TURN é extensão da Spec (sem código próprio) — Task 7 mapeia para 409 e o catálogo de erros em DECISOES-INCREMENTO-2 registra — custo se errado: renomear um código.
 - R31: corpo HTTP limitado (64 KiB) antes de ler/parsear → 413 com envelope; nada da entrada do cliente é ecoado sem validar formato — custo se errado: rejeitar payload legítimo grande (não existe no MVP).
+- R32 (onda final): ACK de render só é `accepted` se a geração de conexão é a vigente, `scene_revision` é a atual, `effect_id` é o que o servidor emitiu para aquela revisão (`scene_effect_id`) e `attempt_id` é o da tentativa ativa; qualquer outro caso grava e responde `stale`. Custo se errado: ACK legítimo atrasado vira `stale`.
+- R33 (onda final): repetir `POST /v1/sessions` com o mesmo `request_id` depois da expiração responde 404 `NOT_FOUND`, nunca token nem snapshot. O cliente deve usar um `request_id` novo para abrir outra sessão depois de expirar (24 h). Custo se errado: o cliente precisa gerar outro id.
+- R34 (onda final): repetir `claim-control` depois que outro controlador assumiu responde 403 `CONTROL_LOST`, em vez de devolver o controle antigo.
+- R35 (onda final): erros HTTP gerados pelo Starlette (405 e demais) passam pelo envelope só com `code` (R29): `METHOD_NOT_ALLOWED` (405, mantém `Allow`) e, no endpoint de comandos, `UNSUPPORTED_MEDIA_TYPE` (415) quando o `Content-Type` não é JSON, sem eco. `after_seq` tem teto `MAX_REVISION` (validação 422, nunca 500).
+- R36 (onda final): o texto livre `evidence` do avaliador de explicação não é persistido nem emitido; `explanation_evaluated` leva só `rating` e `modality`. Custo se errado: perder a justificativa do avaliador na auditoria.
+- R37 (onda final): fechar ou expirar a sessão encerra os jobs de análise abertos (`superseded`); resultado tardio vira `discarded` e a observação não é gravada. A reconciliação na retomada grava `analysis_completed` com o ator `vision_worker` e trata `DomainError` como as demais rotas.
+
+Limitação conhecida (não corrigida, adiada): se o avaliador de explicação está indisponível, `submit_explanation` responde 503 e a resposta da criança é rejeitada junto, em vez de ficar guardada para nova tentativa. O avaliador ainda roda dentro do lock da linha da sessão. Ambos entram no incremento 5, com o avaliador real.
 
 ## Pendente de decisão do usuário
 
@@ -92,6 +100,7 @@ Itens menores que os revisores levantaram e que a execução adiou de propósito
 - Task 4 (menores): always_race só checa revisão; _is_result_race por substring do constraint; TUTOR_REQUIRE_PG=1 no CI/EXECUCAO (Task 8).
 - Task 5: teto de receipts por sessão (Task 8/inc 6).
 - Task 6 (menores, para a onda final): analysis_completed reconciliado gravado com actor learner (deveria vision_worker); reconciliação sem guarda DomainError; jobs queued de sessão fechada ficam queued + observação gravada em resultado tardio; bloco save/append/SessionRow triplicado (service.py +320 linhas); request_id do submit sem formato; teste deferred→resume→retake e colisão submit×comando ausentes.
+- Resolvido na onda final (Task 6): ator `vision_worker` na reconciliação, guarda `DomainError`, jobs de sessão fechada/expirada encerrados, helper único de gravação. Segue aberto: formato do `request_id` do submit; teste deferred→resume→retake e colisão submit×comando.
 - Task 7: SESSION_LIMIT/throttle de POST /v1/sessions e CORS → incremento de deploy (G7). Contrato comparado parseado (ok).
 
 Resolvido depois: "P7 reconciliação de retomada não verificada" ficou coberto pelo teste de AC-37 da Task 6 (pausa, adiamento e retomada em uma só revisão).
@@ -100,7 +109,7 @@ Destaques:
 
 - `SESSION_LIMIT` (429, throttle de `POST /v1/sessions`) e CORS não existem na API do incremento 2. Entram no incremento de deploy (G7). O código `SESSION_LIMIT` está no catálogo e na tabela HTTP, mas nada o emite.
 - Os campos de revisão do `SessionState` ainda não têm `le=MAX_REVISION`; só o envelope do comando e as rotas têm o teto.
-- O evento `analysis_completed` gravado na reconciliação da retomada leva o ator `learner`; o correto seria `vision_worker`.
+- Resolvido na onda final (R37): o evento `analysis_completed` da reconciliação leva o ator `vision_worker`.
 - Não há teto de recibos de render (`render_receipts`) por sessão.
 
 ## Atualizações pendentes no Spec.md
@@ -116,6 +125,7 @@ O `Spec.md` é do usuário e não foi editado. Para ficar coerente com o que foi
    - `STALE_TURN` (409, não retentável): comando de tutor com `turn_epoch` diferente do vigente (R30). Extensão sem código próprio na Spec.
    - `PAYLOAD_TOO_LARGE` (413): corpo HTTP acima de 64 KiB (R31). Só existe na borda HTTP.
    - `INTERNAL_ERROR` (500): erro inesperado, devolvido no envelope sem detalhe. Só existe na borda HTTP.
+   - `METHOD_NOT_ALLOWED` (405) e `UNSUPPORTED_MEDIA_TYPE` (415): só na borda HTTP (R35).
 7. Também fora da lista de rotas da Parte II §8: `GET /v1/sessions/{id}/events?after_seq=` (P8), usada na retomada incremental e no AC-36.
 
 O conflito 1 do plano é o R19 acima e depende da decisão do usuário.

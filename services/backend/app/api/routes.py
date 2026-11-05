@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import TypeAdapter
 
@@ -19,7 +19,7 @@ from app.api.schemas import (
     EventsResponse,
     ReceiptResponse,
 )
-from app.domain.division.commands import Command
+from app.domain.division.commands import MAX_REVISION, Command
 from app.sessions.context import ActorContext
 from app.sessions.receipts import RenderReceipt
 from app.sessions.service import SessionService
@@ -37,7 +37,7 @@ _DESCRIPTIONS: dict[int, str] = {
     409: "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, "
     "IDEMPOTENCY_CONFLICT, INVALID_TRANSITION",
     413: "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE",
-    415: "UNSUPPORTED_IMAGE",
+    415: "UNSUPPORTED_IMAGE, UNSUPPORTED_MEDIA_TYPE (o comando exige application/json)",
     422: "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT",
     429: "SESSION_LIMIT",
     500: "INTERNAL_ERROR",
@@ -110,6 +110,9 @@ def get_session(session_id: str, service: Service, ctx: Ctx) -> dict[str, Any]:
 async def post_command(
     session_id: str, request: Request, service: Service, ctx: Ctx, response: Response
 ) -> dict[str, Any]:
+    media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if media_type != "application/json":  # depois da autenticação (Ctx), antes de ler o corpo
+        raise HTTPException(status_code=415)
     raw = await request.body()
     outcome = await run_in_threadpool(service.execute_command, ctx, session_id, raw)
     response.status_code = outcome.status_code
@@ -152,6 +155,6 @@ def list_events(
     session_id: str,
     service: Service,
     ctx: Ctx,
-    after_seq: Annotated[int, Query(ge=0)] = 0,
+    after_seq: Annotated[int, Query(ge=0, le=MAX_REVISION)] = 0,
 ) -> dict[str, Any]:
     return {"events": service.list_events(ctx, session_id, after_seq)}

@@ -12,6 +12,7 @@ from datetime import timedelta
 import pytest
 from app.db.engine import make_engine
 from app.db.schema import attempts, command_results, session_credentials, session_events, sessions
+from app.domain.division.classification import ExplanationResult
 from app.sessions import repository
 from app.sessions import service as service_module
 from app.sessions.context import ActorContext, default_ids
@@ -332,6 +333,30 @@ def test_unavailable_evaluator_maps_to_provider_unavailable(engine, make_service
     assert e.value.code == "PROVIDER_UNAVAILABLE"
     assert e.value.current_revision == state_of(svc, sid).revision
     assert dump_tables(engine, sid) == before
+
+
+def test_r27_free_text_evidence_from_the_evaluator_is_never_stored(engine, make_service):
+    """R27: o texto livre que o avaliador devolve como `evidence` pode citar a fala da criança;
+    nem o estado, nem o evento, nem o ledger o guardam."""
+    leak = "LEAK-citacao-da-crianca-quatro-grupos"
+
+    class LeakyEvaluator:
+        def evaluate(self, item_id, text):
+            return ExplanationResult(rating="sufficient", modality="text", evidence=leak)
+
+    svc = make_service(engine, evaluator=LeakyEvaluator())
+    ctx, sid = start_practice(svc)
+    send(svc, ctx, sid, cmd("submit_answer", answer=6))
+    send(svc, ctx, sid, cmd("submit_explanation", text="4 grupos de 6 dão 24"))
+
+    dumped = json.dumps(dump_tables(engine, sid), default=str)
+    assert leak not in dumped
+    (evaluated,) = event_rows(engine, sid, "explanation_evaluated")
+    assert evaluated["data"] == {"rating": "sufficient", "modality": "text"}  # só estruturado
+    stored = state_of(svc, sid).active_attempt.explanation
+    assert (stored.rating, stored.modality, stored.evidence) == ("sufficient", "text", None)
+    # a classificação segue usando a nota
+    assert event_rows(engine, sid, "attempt_evaluated")[-1]["data"]["outcome"]
 
 
 # --- autorização -----------------------------------------------------------------------------

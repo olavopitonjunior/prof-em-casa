@@ -22,6 +22,7 @@ from conftest import (
     body_of,
     event_rows,
     move_body,
+    moved_effect,
     request_id,
     revisions,
     run_parallel,
@@ -218,6 +219,20 @@ def test_post_sessions_replay_reveals_no_more_than_the_original(svc):
     assert RID_B not in json.dumps(late.snapshot)
 
 
+def test_post_sessions_replay_after_expiry_is_not_found_and_reveals_nothing(svc, clock):
+    created = svc.create_session(request_id(1), VERSION)
+    clock.advance(timedelta(hours=24) - timedelta(seconds=1))
+    assert svc.create_session(request_id(1), VERSION).replay  # ainda vale
+    clock.advance(timedelta(seconds=1))  # expires_at <= agora
+    with pytest.raises(SessionError) as e:
+        svc.create_session(request_id(1), VERSION)
+    assert e.value.code == "NOT_FOUND"
+    assert created.session_token not in str(e.value) and created.session_id not in str(e.value)
+    # o cliente recupera com um request_id novo
+    fresh = svc.create_session(request_id(2), VERSION)
+    assert not fresh.replay and fresh.session_id != created.session_id
+
+
 # --- R30: turno antigo do tutor -----------------------------------------------------------------
 
 
@@ -335,8 +350,19 @@ def test_ac38_second_tab_takes_control(svc, two_tabs):
         tab_b, sid, move_body(svc, sid, rev=R + 1, scene_rev=S, cmd_id="c-new-tab")
     )
     assert moved.body["revision"] == R + 2
+    effect = moved.body["scene_effect"]["effect_id"]
     assert svc.record_render_receipt(
-        tab_b, sid, receipt(sid, generation=2, scene_revision=S + 1, receipt_id="receipt-002")
+        tab_b,
+        sid,
+        receipt(
+            sid,
+            generation=2,
+            scene_revision=S + 1,
+            receipt_id="receipt-002",
+            effect_id=effect,
+            command_id="c-new-tab",
+            attempt_id=state_of(svc, sid).active_attempt_id,
+        ),
     ) == {"receipt_id": "receipt-002", "outcome": "accepted"}
 
 
@@ -386,14 +412,19 @@ def test_claim_control_replay_is_idempotent(svc, two_tabs):
     assert again == first and again["connection_generation"] == 2
     assert revisions(svc, sid)[0] == R + 1
     assert len(event_rows(svc.engine, sid, "control_claimed")) == 1
-    # O replay chega depois que outra aba assumiu: devolve a resposta original, sem retomar o controle.
+    # O replay chega depois que outra aba assumiu: não devolve um controle que já se perdeu.
     tab_c = ActorContext("learner", sid, sid, RID_C)
     svc.claim_control(tab_c, sid, request_id=RID_C, expected_revision=R + 1)
-    assert svc.claim_control(tab_b, sid, request_id=RID_B, expected_revision=R) == first
+    with pytest.raises(SessionError) as e:
+        svc.claim_control(tab_b, sid, request_id=RID_B, expected_revision=R)
+    assert e.value.code == "CONTROL_LOST"
     with pytest.raises(SessionError) as e:
         send(svc, tab_b, sid, cmd("pause_session"))
     assert e.value.code == "CONTROL_LOST"
     assert state_of(svc, sid).revision == R + 2
+    assert svc.claim_control(tab_c, sid, request_id=RID_C, expected_revision=R + 1)["revision"] == (
+        R + 2
+    )  # quem ainda controla continua recebendo o replay
 
 
 def test_claim_control_same_request_with_other_revision_conflicts(svc, two_tabs):
@@ -490,13 +521,14 @@ def test_concurrent_claims_have_one_winner(svc, two_tabs):
 
 def test_receipt_duplicate_and_no_revision_change(svc, two_tabs):
     tab_a, _, sid = two_tabs
+    live = moved_effect(svc, tab_a, sid)
     R, S = revisions(svc, sid)
-    first = svc.record_render_receipt(tab_a, sid, receipt(sid, scene_revision=S))
+    first = svc.record_render_receipt(tab_a, sid, receipt(sid, **live))
     assert first == {"receipt_id": "receipt-001", "outcome": "accepted"}
-    again = svc.record_render_receipt(tab_a, sid, receipt(sid, scene_revision=S))
+    again = svc.record_render_receipt(tab_a, sid, receipt(sid, **live))
     assert again == {"receipt_id": "receipt-001", "outcome": "duplicate"}
     # Mesmo id com outro conteúdo continua sendo o mesmo ACK.
-    other = receipt(sid, scene_revision=S, status="render_failed")
+    other = receipt(sid, status="render_failed", **live)
     assert svc.record_render_receipt(tab_a, sid, other)["outcome"] == "duplicate"
     assert count_rows(svc.engine, render_receipts, sid) == 1
     assert revisions(svc, sid) == (R, S)
@@ -511,30 +543,45 @@ def test_receipt_duplicate_and_no_revision_change(svc, two_tabs):
 
 def test_receipt_stale_when_generation_differs_or_scene_is_ahead(svc, two_tabs):
     tab_a, _, sid = two_tabs
-    _, S = revisions(svc, sid)
+    old = moved_effect(svc, tab_a, sid, cmd_id="c-old", piece="piece-01")
+    live = moved_effect(svc, tab_a, sid, cmd_id="c-live", piece="piece-02")
+    S = live["scene_revision"]
+    cases = {
+        "older-generation": {"generation": 1, "scene_revision": S + 1},
+        "newer-generation": {"generation": 2, **live},
+        "future-scene": {"generation": 1, "scene_revision": S + 1},
+        "current": {"generation": 1, **live},
+        # Spec II §5: ACK de efeito/cena/tentativa/comando divergente é ignorado para sincronização.
+        "older-scene": {"generation": 1, **old},
+        "scene-ok-effect-unknown": {**live, "effect_id": "effect-unknown"},
+        "scene-ok-effect-of-old-scene": {**live, "effect_id": old["effect_id"]},
+        "scene-ok-command-unknown": {**live, "command_id": "c-never-sent"},
+        "scene-ok-command-of-old-scene": {**live, "command_id": old["command_id"]},
+        "attempt-unknown": {**live, "attempt_id": "att-never"},
+        "attempt-missing": {**live, "attempt_id": None},
+    }
     outcomes = {
         name: svc.record_render_receipt(tab_a, sid, receipt(sid, receipt_id=name, **over))[
             "outcome"
         ]
-        for name, over in {
-            "older-generation": {"generation": 1, "scene_revision": S + 1},
-            "newer-generation": {"generation": 2, "scene_revision": S},
-            "future-scene": {"generation": 1, "scene_revision": S + 1},
-            "current": {"generation": 1, "scene_revision": S},
-            "older-scene": {"generation": 1, "scene_revision": max(S - 1, 0)},
-        }.items()
+        for name, over in cases.items()
     }
-    assert outcomes == {
-        "older-generation": "stale",
-        "newer-generation": "stale",
-        "future-scene": "stale",
-        "current": "accepted",
-        "older-scene": "accepted",
-    }
+    assert outcomes == {name: "accepted" if name == "current" else "stale" for name in cases}
     with svc.engine.connect() as conn:
         rows = conn.execute(select(render_receipts.c.receipt_id, render_receipts.c.outcome))
         stored = {r.receipt_id: r.outcome for r in rows}
     assert stored == outcomes
+
+
+def test_receipt_of_a_command_without_scene_effect_is_stale(svc, two_tabs):
+    tab_a, _, sid = two_tabs
+    live = moved_effect(svc, tab_a, sid)
+    quiet = send(svc, tab_a, sid, cmd("request_help"), command_id="c-help")
+    assert quiet.body["scene_effect"] is None  # a revisão sobe, a cena não
+    assert svc.record_render_receipt(tab_a, sid, receipt(sid, **live))["outcome"] == "accepted"
+    # ...mas um comando que não produziu efeito nunca valida um ACK
+    stray = receipt(sid, receipt_id="receipt-quiet", **{**live, "command_id": "c-help"})
+    assert svc.record_render_receipt(tab_a, sid, stray)["outcome"] == "stale"
 
 
 @pytest.mark.parametrize(
@@ -543,8 +590,8 @@ def test_receipt_stale_when_generation_differs_or_scene_is_ahead(svc, two_tabs):
 )
 def test_receipt_accepts_every_spec_status(svc, two_tabs, status):
     tab_a, _, sid = two_tabs
-    _, S = revisions(svc, sid)
-    out = svc.record_render_receipt(tab_a, sid, receipt(sid, scene_revision=S, status=status))
+    live = moved_effect(svc, tab_a, sid)
+    out = svc.record_render_receipt(tab_a, sid, receipt(sid, status=status, **live))
     assert out["outcome"] == "accepted"
 
 

@@ -19,7 +19,15 @@ from app.sessions.projection import Audience
 # Códigos que só existem na borda HTTP (não nascem no domínio nem no serviço).
 #  - PAYLOAD_TOO_LARGE: decisão R31, corpo acima de MAX_BODY_BYTES (a Spec só tem 413 para imagem).
 #  - INTERNAL_ERROR: exceção não prevista; o corpo nunca leva a causa.
-ApiErrorCode = Literal[*get_args(ErrorCode), "PAYLOAD_TOO_LARGE", "INTERNAL_ERROR"]
+#  - METHOD_NOT_ALLOWED: método HTTP que a rota não aceita (405); só o código, sem o texto padrão.
+#  - UNSUPPORTED_MEDIA_TYPE: o endpoint de comando exige `Content-Type: application/json` (415).
+ApiErrorCode = Literal[
+    *get_args(ErrorCode),
+    "PAYLOAD_TOO_LARGE",
+    "INTERNAL_ERROR",
+    "METHOD_NOT_ALLOWED",
+    "UNSUPPORTED_MEDIA_TYPE",
+]
 
 MAX_BODY_BYTES = 64 * 1024  # R31: nenhum comando, ACK ou criação chega perto disso
 
@@ -44,6 +52,8 @@ HTTP_STATUS: dict[ApiErrorCode, int] = {
     "PROVIDER_UNAVAILABLE": 503,
     "PAYLOAD_TOO_LARGE": 413,
     "INTERNAL_ERROR": 500,
+    "METHOD_NOT_ALLOWED": 405,
+    "UNSUPPORTED_MEDIA_TYPE": 415,
 }
 if not set(get_args(ErrorCode)) <= set(HTTP_STATUS):  # código novo sem status é erro de import
     raise RuntimeError("HTTP_STATUS does not cover every ErrorCode")
@@ -64,10 +74,10 @@ RETRYABLE: frozenset[ApiErrorCode] = frozenset(
 _ECHOABLE_ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
 
 
-def code_response(code: ApiErrorCode) -> JSONResponse:
+def code_response(code: ApiErrorCode, headers: dict[str, str] | None = None) -> JSONResponse:
     """Envelope sem nada do pedido: para erros da borda (corpo grande, falha interna)."""
     body = {"error": {"code": code, "retryable": code in RETRYABLE}}
-    return JSONResponse(body, status_code=HTTP_STATUS[code])
+    return JSONResponse(body, status_code=HTTP_STATUS[code], headers=headers)
 
 
 def error_body(err: SessionError | DomainError, audience: Audience = "learner") -> dict:

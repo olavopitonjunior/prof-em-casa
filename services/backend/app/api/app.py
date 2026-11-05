@@ -12,12 +12,11 @@ from functools import lru_cache
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.errors import MAX_BODY_BYTES, code_response, error_response
+from app.api.errors import MAX_BODY_BYTES, ApiErrorCode, code_response, error_response
 from app.api.routes import router
 from app.content.loader import load_content
 from app.db.engine import create_schema, make_engine
@@ -30,6 +29,12 @@ from app.settings import Settings
 
 API_VERSION = "0.2.0"
 logger = logging.getLogger("app.api")
+
+# Erros do Starlette com código próprio na borda; os demais 4xx viram INVALID_PAYLOAD.
+_HTTP_CODES: dict[int, ApiErrorCode] = {
+    405: "METHOD_NOT_ALLOWED",
+    415: "UNSUPPORTED_MEDIA_TYPE",
+}
 
 
 class BodyLimitMiddleware:
@@ -119,9 +124,14 @@ def _install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # Todo erro HTTP do Starlette sai no envelope, só com o código (R29): nunca o `detail`.
         if exc.status_code == 404:  # rota inexistente: mesmo envelope do recurso inexistente
             return error_response(SessionError("NOT_FOUND"), _audience(request))
-        return await http_exception_handler(request, exc)
+        code = _HTTP_CODES.get(exc.status_code)
+        if code is None:
+            code = "INVALID_PAYLOAD" if 400 <= exc.status_code < 500 else "INTERNAL_ERROR"
+        allow = (exc.headers or {}).get("Allow") if exc.status_code == 405 else None
+        return code_response(code, {"Allow": allow} if allow else None)
 
 
 def _install_openapi(app: FastAPI) -> None:

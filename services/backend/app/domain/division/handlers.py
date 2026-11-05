@@ -98,7 +98,9 @@ def _outcome_event(content: ContentPackage, attempt: Attempt, *, final: bool) ->
 def _evaluate(ctx: Ctx, attempt: Attempt, modality: str, text: str) -> ExplanationResult:
     raw = ctx.evaluator.evaluate(attempt.item_id, text)
     # A modalidade é a do comando (a nota vem do avaliador).
-    return ExplanationResult(rating=raw.rating, modality=modality, evidence=raw.evidence)  # type: ignore[arg-type]
+    # R27: a nota e a modalidade são estruturadas; o `evidence` livre do avaliador é descartado aqui,
+    # antes de ir para o estado (e daí para o banco) ou para um evento.
+    return ExplanationResult(rating=raw.rating, modality=modality)  # type: ignore[arg-type]
 
 
 def _explanation_event(attempt: Attempt, result: ExplanationResult) -> DomainEvent:
@@ -107,7 +109,6 @@ def _explanation_event(attempt: Attempt, result: ExplanationResult) -> DomainEve
         attempt.attempt_id,
         rating=result.rating,
         modality=result.modality,
-        evidence=result.evidence,
     )
 
 

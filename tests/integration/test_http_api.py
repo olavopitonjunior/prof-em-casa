@@ -22,6 +22,7 @@ from conftest import (
     VERSION,
     body_of,
     move_body,
+    moved_effect,
     request_id,
     revisions,
     send,
@@ -58,7 +59,7 @@ def client(svc):
 
 
 def auth(token, controller=None) -> dict:
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     if controller is not None:
         headers["X-Controller-Id"] = controller
     return headers
@@ -99,8 +100,16 @@ def fresh_move(svc, p: Practice, cmd_id="c-move-1", **over) -> bytes:
 
 
 def test_every_error_code_has_a_status_and_the_tables_match_the_spec():
-    assert set(HTTP_STATUS) == set(get_args(ErrorCode)) | {"PAYLOAD_TOO_LARGE", "INTERNAL_ERROR"}
+    http_only = {
+        "PAYLOAD_TOO_LARGE",
+        "INTERNAL_ERROR",
+        "METHOD_NOT_ALLOWED",
+        "UNSUPPORTED_MEDIA_TYPE",
+    }
+    assert set(HTTP_STATUS) == set(get_args(ErrorCode)) | http_only
     assert HTTP_STATUS["PAYLOAD_TOO_LARGE"] == 413 and HTTP_STATUS["INTERNAL_ERROR"] == 500
+    assert HTTP_STATUS["METHOD_NOT_ALLOWED"] == 405
+    assert HTTP_STATUS["UNSUPPORTED_MEDIA_TYPE"] == 415
     assert HTTP_STATUS["STALE_TURN"] == 409 and "STALE_TURN" not in RETRYABLE  # extensão R30
     assert RETRYABLE == {
         "STALE_REVISION",
@@ -391,6 +400,59 @@ def test_unknown_route_uses_the_error_envelope(client):
     assert r.json() == {"error": {"code": "NOT_FOUND", "retryable": False}}
 
 
+def test_wrong_method_uses_the_error_envelope_without_detail(client, practice):
+    for method, url in (("DELETE", practice.sess_url), ("GET", practice.cmd_url)):
+        r = client.request(method, url, headers=practice.headers)
+        assert r.status_code == 405
+        assert r.json() == {"error": {"code": "METHOD_NOT_ALLOWED", "retryable": False}}
+        assert "Method Not Allowed" not in r.text and "detail" not in r.text
+
+
+@pytest.mark.parametrize("value", ["100000000000000000000", str(2**31), str(2**63)])
+def test_after_seq_is_bounded_and_never_a_500(client, practice, value):
+    r = client.get(f"{practice.sess_url}/events?after_seq={value}", headers=practice.headers)
+    assert r.status_code == 400
+    assert r.json() == {"error": {"code": "INVALID_PAYLOAD", "retryable": False}}
+
+
+def test_after_seq_at_the_ceiling_is_accepted(client, practice):
+    from app.domain.division.commands import MAX_REVISION
+
+    r = client.get(f"{practice.sess_url}/events?after_seq={MAX_REVISION}", headers=practice.headers)
+    assert r.status_code == 200 and r.json() == {"events": []}
+
+
+@pytest.mark.parametrize(
+    "content_type", [None, "text/plain", "application/x-www-form-urlencoded", "application/jsonx"]
+)
+def test_command_requires_json_content_type_415_without_mutation(
+    client, svc, practice, content_type
+):
+    R = revision(client, practice)
+    headers = auth(practice.token, practice.controller)
+    headers.pop("Content-Type")
+    if content_type is not None:
+        headers["Content-Type"] = content_type
+    r = client.post(practice.cmd_url, content=fresh_move(svc, practice), headers=headers)
+    assert r.status_code == 415
+    assert r.json() == {"error": {"code": "UNSUPPORTED_MEDIA_TYPE", "retryable": False}}
+    assert revision(client, practice) == R
+
+
+def test_command_content_type_with_charset_is_accepted(client, svc, practice):
+    headers = auth(practice.token, practice.controller)
+    headers["Content-Type"] = "Application/JSON; charset=utf-8"
+    r = client.post(practice.cmd_url, content=fresh_move(svc, practice), headers=headers)
+    assert r.status_code == 200
+
+
+def test_content_type_is_checked_after_authentication(client, svc, practice):
+    r = client.post(
+        practice.cmd_url, content=fresh_move(svc, practice), headers={"Content-Type": "text/plain"}
+    )
+    assert r.status_code == 401
+
+
 # --- rotas que faltavam --------------------------------------------------------------------------
 
 
@@ -413,17 +475,15 @@ def test_claim_control_takes_over_and_old_controller_loses_it(client, svc, pract
     assert new.status_code == 200
 
 
-def test_render_receipt_200_and_duplicate(client, practice):
+def test_render_receipt_200_and_duplicate(client, svc, practice):
+    live = moved_effect(svc, learner_ctx_of(practice), practice.sid)
     receipt = {
         "schema_version": "1.0",
         "receipt_id": "receipt-001",
-        "effect_id": "effect-1",
-        "command_id": "cmd-1",
         "session_id": practice.sid,
-        "attempt_id": None,
-        "scene_revision": 0,
         "connection_generation": 1,
         "status": "render_applied",
+        **live,
     }
     url = f"{practice.sess_url}/render-receipts"
     first = client.post(url, json=receipt, headers=practice.headers)
@@ -433,6 +493,8 @@ def test_render_receipt_200_and_duplicate(client, practice):
         "outcome": "accepted",
     }
     assert again.json()["outcome"] == "duplicate"
+    wrong = {**receipt, "receipt_id": "receipt-002", "effect_id": "effect-0"}
+    assert client.post(url, json=wrong, headers=practice.headers).json()["outcome"] == "stale"
 
 
 def test_events_after_seq_and_learner_projection(client, svc, practice):

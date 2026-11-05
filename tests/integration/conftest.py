@@ -315,6 +315,20 @@ def move_body(
     ).encode()
 
 
+def moved_effect(svc, ctx, sid, cmd_id="c-effect-1", **move) -> dict:
+    """Move uma peça pelo serviço e devolve os campos de um ACK legítimo desse efeito de cena."""
+    rev, scene = revisions(svc, sid)
+    out = svc.execute_command(
+        ctx, sid, move_body(svc, sid, rev=rev, scene_rev=scene, cmd_id=cmd_id, **move)
+    )
+    return {
+        "effect_id": out.body["scene_effect"]["effect_id"],
+        "command_id": cmd_id,
+        "scene_revision": out.body["scene_revision"],
+        "attempt_id": state_of(svc, sid).active_attempt_id,
+    }
+
+
 def revisions(svc, sid) -> tuple[int, int]:
     state = state_of(svc, sid)
     return state.revision, state.scene_revision

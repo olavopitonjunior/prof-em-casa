@@ -96,7 +96,7 @@ LEARNER_EVENT_FIELDS: dict[str, frozenset[str]] = {
 
 # Chaves emitidas pelos handlers e deixadas de fora de propósito:
 # - answer/correct: a resposta e a correção;
-# - rating/evidence: a nota da explicação e o que o avaliador viu;
+# - rating: a nota da explicação (o `evidence` livre do avaliador nem chega a ser emitido, R27);
 # - outcome/final: o resultado classificado da tentativa;
 # - verification_status/issues/reconstruction_allowed: dizem se o caderno está certo;
 # - reason (texto livre da criança) nunca é emitido: help_granted leva só has_reason (R28);
@@ -106,7 +106,7 @@ LEARNER_EXCLUDED_FIELDS: dict[str, frozenset[str]] = {
     "analysis_completed": _f("job_id", "verification_status", "issues", "reconstruction_allowed"),
     "analysis_superseded": _f("job_id"),
     "answer_submitted": _f("answer", "correct"),
-    "explanation_evaluated": _f("rating", "evidence"),
+    "explanation_evaluated": _f("rating"),
     "attempt_evaluated": _f("outcome", "final"),
 }
 

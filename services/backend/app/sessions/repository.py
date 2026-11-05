@@ -562,6 +562,20 @@ def supersede_jobs(
     )
 
 
+def supersede_open_jobs(conn: Connection, session_id: str, *, now: datetime) -> None:
+    """Encerra (`superseded`) todos os jobs abertos e não aplicados da sessão: fechamento e
+    expiração. Um job já aplicado continua como está."""
+    conn.execute(
+        update(analysis_jobs)
+        .where(
+            analysis_jobs.c.session_id == session_id,
+            analysis_jobs.c.status.in_(_OPEN_JOB_STATUSES),
+            analysis_jobs.c.applied.is_(False),
+        )
+        .values(status="superseded", updated_at=now)
+    )
+
+
 def insert_observation(
     conn: Connection,
     *,

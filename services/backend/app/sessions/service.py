@@ -12,7 +12,7 @@ import hmac
 import json
 import re
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -49,9 +49,12 @@ _BAD_TEXT_RE = re.compile("[\x00\ud800-\udfff]")
 
 
 MAX_BEARER_LENGTH = 512
-# Motivo do `analysis_superseded` que não encerra o job: o resultado tardio de uma sessão fechada
-# é registrado como `discarded` (AC-37), não como `superseded`.
-_KEEP_JOB_REASONS = frozenset({"session_closed"})
+
+
+def scene_effect_id(scene_revision: int) -> str:
+    """Id do efeito de cena que o servidor emite para uma revisão de cena (Spec II §5). É a única
+    fonte do formato: a resposta do comando e a validação do ACK usam a mesma função."""
+    return f"effect-{scene_revision}"
 
 
 def _same_controller(presented: str | None, current: str) -> bool:
@@ -180,6 +183,11 @@ class SessionService:
             if existing is not None:
                 row = repository.load_session(conn, existing, for_update=False)
                 assert row is not None  # a chave estrangeira garante; o CASCADE apaga os dois
+                if row.expires_at <= now:
+                    # P11 vale também para o replay: nunca devolve token nem snapshot de uma sessão
+                    # expirada. O request_id fica preso à sessão morta até a purga; o cliente usa
+                    # um request_id novo.
+                    raise SessionError("NOT_FOUND")
                 # Sem troca de controle (geração 1), devolve o id original: quem perdeu a
                 # resposta se recupera. Depois de uma troca devolve um id novo que não controla
                 # nada, para que o replay nunca entregue o controlador vigente.
@@ -251,6 +259,51 @@ class SessionService:
         audience: Audience = "learner" if ctx.actor == "learner" else "service"
         return [project_event(record, audience) for record in records]
 
+    def _commit_state(
+        self,
+        conn: Connection,
+        *,
+        row: SessionRow,
+        before: SessionState,
+        after: SessionState,
+        batches: Sequence[tuple[str, str | None, Sequence[repository.NewEvent]]],
+        now: Any,
+        connection_generation: int | None = None,
+        controller_id: str | None = None,
+    ) -> None:
+        """Grava o novo estado (com a guarda otimista de revisão) e os eventos, em ordem contínua
+        de `event_seq`. Cada lote leva o seu ator e o seu `command_id`: a reconciliação da retomada
+        entra com o ator `vision_worker`, na mesma revisão do comando do aluno."""
+        repository.save_session(
+            conn,
+            expected_revision=before.revision,
+            row=SessionRow(
+                state=after,
+                connection_generation=(
+                    row.connection_generation
+                    if connection_generation is None
+                    else connection_generation
+                ),
+                controller_id=row.controller_id if controller_id is None else controller_id,
+                expires_at=row.expires_at,
+            ),
+            now=now,
+        )
+        seq = before.last_event_seq + 1
+        for actor, command_id, events in batches:
+            repository.append_events(
+                conn,
+                before.session_id,
+                events,
+                first_seq=seq,
+                revision=after.revision,
+                actor=actor,
+                command_id=command_id,
+                now=now,
+                event_id=lambda: self._ids("evt"),
+            )
+            seq += len(events)
+
     # --- comando ---------------------------------------------------------------------------------
 
     def execute_command(
@@ -309,33 +362,26 @@ class SessionService:
                     command_id=command_id,
                 ) from None
             after, events = result.session, list(result.events)
+            reconciled: list[DomainEvent] = []
             if command.type == "resume_session":
                 # P7: a reconciliação entra na mesma transação e na mesma revisão da retomada.
-                after, extra = self._reconcile_on_resume(conn, session_id, after, now)
-                events += extra
-            self._supersede_jobs(conn, session_id, events, now)
-            repository.save_session(
+                after, reconciled = self._reconcile_on_resume(
+                    conn, session_id, after, now, command_id=command_id
+                )
+            self._supersede_jobs(conn, session_id, events + reconciled, now)
+            self._commit_state(
                 conn,
-                expected_revision=before.revision,
-                row=SessionRow(
-                    state=after,
-                    connection_generation=row.connection_generation,
-                    controller_id=row.controller_id,
-                    expires_at=row.expires_at,
-                ),
+                row=row,
+                before=before,
+                after=after,
+                batches=[
+                    (ctx.actor, command_id, events),
+                    # quem concluiu a análise foi o worker de visão, não o aluno que retomou
+                    ("vision_worker", command_id, reconciled),
+                ],
                 now=now,
             )
-            repository.append_events(
-                conn,
-                session_id,
-                events,
-                first_seq=before.last_event_seq + 1,
-                revision=after.revision,
-                actor=ctx.actor,
-                command_id=command_id,
-                now=now,
-                event_id=lambda: self._ids("evt"),
-            )
+            events = events + reconciled
             outcomes = {
                 e.attempt_id: e.data["outcome"]
                 for e in events
@@ -350,7 +396,7 @@ class SessionService:
                 "event_seq": after.last_event_seq,
                 "scene_effect": (
                     {
-                        "effect_id": f"effect-{after.scene_revision}",
+                        "effect_id": scene_effect_id(after.scene_revision),
                         "requires_ack": "render_applied",
                     }
                     if result.scene_changed
@@ -478,27 +524,13 @@ class SessionService:
                 now=now,
             )
             self._supersede_jobs(conn, session_id, events, now)
-            repository.save_session(
+            self._commit_state(
                 conn,
-                expected_revision=before.revision,
-                row=SessionRow(
-                    state=after,
-                    connection_generation=row.connection_generation,
-                    controller_id=row.controller_id,
-                    expires_at=row.expires_at,
-                ),
+                row=row,
+                before=before,
+                after=after,
+                batches=[(ctx.actor, request_id, events)],
                 now=now,
-            )
-            repository.append_events(
-                conn,
-                session_id,
-                events,
-                first_seq=before.last_event_seq + 1,
-                revision=after.revision,
-                actor=ctx.actor,
-                command_id=request_id,
-                now=now,
-                event_id=lambda: self._ids("evt"),
             )
             response = {
                 "artifact_id": artifact_id,
@@ -530,6 +562,27 @@ class SessionService:
         decidir (`apply_analysis_result`). Job já terminal devolve a disposição anterior, sem efeito."""
         if ctx.actor != "vision_worker":
             raise SessionError("ACTION_NOT_ALLOWED", "only the vision worker completes analyses")
+        if self._end_jobs_of_expired_session(job_id):
+            raise SessionError("NOT_FOUND")  # P11, depois de encerrar os jobs (já commitado)
+        return self._complete_analysis(ctx, job_id, observation)
+
+    def _end_jobs_of_expired_session(self, job_id: str) -> bool:
+        """Sessão expirada: nenhum job dela fica `queued` para sempre. Transação própria, para que
+        o encerramento fique gravado mesmo com o 404 que o worker recebe."""
+        now = self._clock()
+        with self.engine.begin() as conn:
+            found = repository.find_job(conn, job_id)
+            if found is None:
+                return False  # o caminho normal responde NOT_FOUND
+            row = repository.load_session(conn, found.session_id, for_update=True)
+            if row is None or row.expires_at > now:
+                return False
+            repository.supersede_open_jobs(conn, found.session_id, now=now)
+            return True
+
+    def _complete_analysis(
+        self, ctx: ActorContext, job_id: str, observation: NotebookObservation
+    ) -> Disposition:
         now = self._clock()
         with self.engine.begin() as conn:
             found = repository.find_job(conn, job_id)
@@ -579,28 +632,13 @@ class SessionService:
                     now=now,
                 )
             if applied.result is not None:  # só quando a disposição é "applied"
-                after = applied.result.session
-                repository.save_session(
+                self._commit_state(
                     conn,
-                    expected_revision=state.revision,
-                    row=SessionRow(
-                        state=after,
-                        connection_generation=row.connection_generation,
-                        controller_id=row.controller_id,
-                        expires_at=row.expires_at,
-                    ),
+                    row=row,
+                    before=state,
+                    after=applied.result.session,
+                    batches=[(ctx.actor, None, applied.result.events)],
                     now=now,
-                )
-                repository.append_events(
-                    conn,
-                    job.session_id,
-                    applied.result.events,
-                    first_seq=state.last_event_seq + 1,
-                    revision=after.revision,
-                    actor=ctx.actor,
-                    command_id=None,
-                    now=now,
-                    event_id=lambda: self._ids("evt"),
                 )
             repository.update_job(
                 conn,
@@ -616,7 +654,9 @@ class SessionService:
     def _previous_disposition(job: repository.JobRow, state: SessionState) -> Disposition:
         """A disposição de um job já terminal, reconstruída do que ficou gravado."""
         if job.status == "superseded":
-            return "superseded"
+            # Sessão fechada não recebe resultado tardio (AC-37): é `discarded`, mesmo que o job
+            # tenha sido encerrado pelo próprio fechamento.
+            return "discarded" if state.session_status == "closed" else "superseded"
         if job.applied:
             return "applied"
         if job.status in ("ready", "needs_clarification") and state.session_status != "closed":
@@ -624,7 +664,13 @@ class SessionService:
         return "discarded"
 
     def _reconcile_on_resume(
-        self, conn: Connection, session_id: str, state: SessionState, now: Any
+        self,
+        conn: Connection,
+        session_id: str,
+        state: SessionState,
+        now: Any,
+        *,
+        command_id: str,
     ) -> tuple[SessionState, list[DomainEvent]]:
         """Na retomada, aplica o resultado que chegou durante a pausa (job `ready` ou
         `needs_clarification` ainda com `applied=false`). Sem nova revisão: `bump_revision=False`."""
@@ -649,7 +695,17 @@ class SessionService:
             attempt_id=job.attempt_id,
             observation=NotebookObservation.model_validate(document),
         )
-        applied = apply_analysis_result(state, result, content=self.content, bump_revision=False)
+        try:
+            applied = apply_analysis_result(
+                state, result, content=self.content, bump_revision=False
+            )
+        except DomainError as err:
+            raise SessionError.from_domain(
+                err,
+                current_revision=state.revision,
+                current_scene_revision=state.scene_revision,
+                command_id=command_id,
+            ) from None
         if applied.disposition == "applied" and applied.result is not None:
             repository.update_job(conn, job.job_id, status=job.status, applied=True, now=now)
             return applied.result.session, list(applied.result.events)
@@ -662,15 +718,16 @@ class SessionService:
         conn: Connection, session_id: str, events: list[DomainEvent], now: Any
     ) -> None:
         """Todo `analysis_superseded` do domínio encerra o job na mesma transação (retake, saída do
-        fluxo, nova captura), salvo o fechamento da sessão, que vira `discarded` no resultado."""
+        fluxo, nova captura). O fechamento da sessão encerra todos os jobs abertos, inclusive o
+        resultado adiado que o domínio descarta sem evento: nada fica `queued` para sempre."""
         job_ids = [
             e.data["job_id"]
             for e in events
-            if e.type == "analysis_superseded"
-            and e.data.get("job_id")
-            and e.data.get("reason") not in _KEEP_JOB_REASONS
+            if e.type == "analysis_superseded" and e.data.get("job_id")
         ]
         repository.supersede_jobs(conn, session_id, job_ids, now=now)
+        if any(e.type == "session_closed" for e in events):
+            repository.supersede_open_jobs(conn, session_id, now=now)
 
     # --- controle --------------------------------------------------------------------------------
 
@@ -710,6 +767,9 @@ class SessionService:
             if stored is not None:
                 if stored.kind != "claim_control" or stored.body_hash != digest:
                     raise SessionError("IDEMPOTENCY_CONFLICT", command_id=request_id)
+                if not _same_controller(stored.response.get("controller_id"), row.controller_id):
+                    # Outra aba assumiu depois: o replay não devolve um controle que já se perdeu.
+                    raise SessionError("CONTROL_LOST")
                 return dict(stored.response)
             before = row.state
             if before.session_status == "closed":
@@ -732,27 +792,15 @@ class SessionService:
                 revision=before.revision + 1,
                 last_event_seq=before.last_event_seq + 1,
             )
-            repository.save_session(
+            self._commit_state(
                 conn,
-                expected_revision=before.revision,
-                row=SessionRow(
-                    state=after,
-                    connection_generation=generation,
-                    controller_id=request_id,
-                    expires_at=row.expires_at,
-                ),
+                row=row,
+                before=before,
+                after=after,
+                batches=[(ctx.actor, request_id, [event])],
                 now=now,
-            )
-            repository.append_events(
-                conn,
-                session_id,
-                [event],
-                first_seq=before.last_event_seq + 1,
-                revision=after.revision,
-                actor=ctx.actor,
-                command_id=request_id,
-                now=now,
-                event_id=lambda: self._ids("evt"),
+                connection_generation=generation,
+                controller_id=request_id,
             )
             response = {
                 "controller_id": request_id,
@@ -796,11 +844,7 @@ class SessionService:
                 )
             if repository.receipt_exists(conn, session_id, receipt.receipt_id):
                 return {"receipt_id": receipt.receipt_id, "outcome": "duplicate"}
-            stale = (
-                receipt.connection_generation != row.connection_generation
-                or receipt.scene_revision > row.state.scene_revision
-            )
-            outcome = "stale" if stale else "accepted"
+            outcome = "accepted" if self._receipt_is_current(conn, row, receipt) else "stale"
             repository.insert_receipt(
                 conn,
                 session_id=session_id,
@@ -814,6 +858,25 @@ class SessionService:
                 now=now,
             )
         return {"receipt_id": receipt.receipt_id, "outcome": outcome}
+
+    @staticmethod
+    def _receipt_is_current(conn: Connection, row: SessionRow, receipt: RenderReceipt) -> bool:
+        """Spec II §5: o ACK só sincroniza se descreve o efeito vigente, na geração e na tentativa
+        vigentes. Geração, cena, efeito, comando ou tentativa divergente fica `stale`."""
+        state = row.state
+        if (
+            receipt.connection_generation != row.connection_generation
+            or receipt.scene_revision != state.scene_revision
+            or receipt.effect_id != scene_effect_id(state.scene_revision)
+            or receipt.attempt_id != state.active_attempt_id
+        ):
+            return False
+        # O comando precisa existir e ter produzido exatamente esse efeito.
+        issued = repository.find_result(conn, row.state.session_id, receipt.command_id)
+        if issued is None or issued.kind != "command":
+            return False
+        effect = issued.response.get("scene_effect")
+        return isinstance(effect, dict) and effect.get("effect_id") == receipt.effect_id
 
     # --- passos compartilhados -------------------------------------------------------------------
 

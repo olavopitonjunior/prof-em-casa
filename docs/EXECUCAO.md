@@ -59,6 +59,10 @@ documento não afirma ganho de aprendizagem.
 | AC-27 | `test_ac27_rejected_commands_leave_no_partial_mutation` | revisão velha, tentativa trocada, cena velha, origem da peça incorreta: erro e sessão intacta |
 | AC-39 | `test_ac39_invalid_json_extra_fields_and_unauthorized_actions_change_nothing` | JSON inválido, campo extra, tipo fora do catálogo, ator não autorizado: rejeitados, nada executa |
 
+## Onda final (correções da revisão)
+
+Itens F1 a F9 da revisão final, com teste vermelho antes de cada correção de comportamento: validação do ACK de render (R32), repetição de `POST /v1/sessions` após a expiração (R33), `claim-control` repetido sem ser mais o controlador (R34), 405/415 e `after_seq` limitado no envelope (R35), `evidence` não persistido (R36), jobs encerrados ao fechar/expirar, ator `vision_worker` e guarda `DomainError` na reconciliação, helper único de gravação (R37). No aceite, o AC-33 ganhou o caso que isola a guarda de tentativa e o AC-37 um controle positivo. O hash do commit de código desta onda está no `git log` (mensagem "onda final"); o registro de hash foi feito num commit de documentação seguinte.
+
 ## Não comprovado neste incremento
 
 Não conta como pronto na demonstração:
@@ -102,23 +106,23 @@ de aprendizagem.
 | Ferramentas | uv 0.12.5, pytest 9.2.0 |
 | Postgres (cluster descartável dos testes) | 17.11 (Homebrew), `initdb`/`pg_ctl` sob `tmp_path_factory`, porta livre em 127.0.0.1, parado no teardown |
 | SQLite (`sqlite3.sqlite_version`) | 3.53.1 |
-| Código sob teste | branch `feat/incremento-2-sessao`, base `09bcdc8`; último commit de código `0f938e5`. Os testes de aceite, o hook de rastreabilidade e este registro entram no commit seguinte |
+| Código sob teste | branch `feat/incremento-2-sessao`, base `09bcdc8`; último commit de código da Task 7 `0f938e5`; testes de aceite e rastreabilidade (Task 8) em `9f1d5f1`; onda final de correções (ACK, expiração, envelope 405/415, `after_seq`, controle, evidence, jobs encerrados, AC-33/AC-37) no commit descrito em "Onda final" abaixo |
 | Data | 2026-11-05 |
 
 ## Comandos e resultado (incremento 2)
 
 | Comando | Resultado |
 |---|---|
-| `uv run pytest -q` | 1118 passed, 0 skipped |
-| `uv run pytest -q -m ac -rA` | 130 passed, 988 deselected; 17 ids com teste marcado e aprovado: os 16 exigidos (10 do incremento 1 e 7 do 2, com AC-27 nos dois) e AC-45, marcado a mais |
-| `TUTOR_REQUIRE_PG=1 uv run pytest -q -rs` | 1118 passed, 0 skipped (nenhum skip de Postgres) |
+| `uv run pytest -q` | 1152 passed, 0 skipped |
+| `uv run pytest -q -m ac -rA` | 130 passed, 1022 deselected; 17 ids com teste marcado e aprovado: os 16 exigidos (10 do incremento 1 e 7 do 2, com AC-27 nos dois) e AC-45, marcado a mais |
+| `TUTOR_REQUIRE_PG=1 uv run pytest -q -rs` | 1152 passed, 0 skipped (nenhum skip de Postgres) |
 | `uv run ruff check .` | All checks passed |
 | `uv run ruff format --check services tests` | 68 files already formatted |
 
 Com `TUTOR_REQUIRE_PG=1`, a falta dos binários do Postgres falha o teste em vez de pulá-lo
 (`pg_cluster` em `tests/integration/conftest.py`). Sem a variável e sem Postgres, os testes
 parametrizados por `db_url` pulam a metade `postgres`; por isso esta execução com a variável é a
-que vale como evidência. O conjunto passou de 505 testes (incremento 1) para 1118.
+que vale como evidência. O conjunto passou de 505 testes (incremento 1) para 1152. `ruff format --check .` na raiz acusa dois arquivos de `docs/plans/*.md` que já estavam sem formatar; a verificação vale para `services` e `tests`.
 
 Em 05/11/2026 a execução emitiu um aviso (`StarletteDeprecationWarning`: o `TestClient` do
 Starlette prefere `httpx2` a `httpx`). Não afeta resultado.
@@ -150,9 +154,9 @@ Starlette prefere `httpx2` a `httpx`). Não afeta resultado.
 |---|---|---|---|
 | AC-26 | `test_ac26_same_body_twice_has_one_effect` | mesmo corpo duas vezes: 200 nas duas, `Idempotent-Replay: true` na segunda, mesma resposta, uma revisão a mais, peça movida uma vez, um `scene_changed` | `test_http_replay_header_and_single_effect`; `test_ac26_same_command_twice_one_effect`; concorrência de duplicatas em `test_concurrent_duplicates_single_effect` (serviço, threads) |
 | AC-27 | `test_ac27_rejections_name_the_code_and_leave_no_trace` | `IDEMPOTENCY_CONFLICT` (409), `STALE_REVISION` (409), `ATTEMPT_CHANGED` (409), `INVALID_SCENE` (422); snapshot idêntico e nenhum evento novo após cada rejeição; a rejeição não ocupa o `command_id` (P5) | `test_ac27_http_codes`; `test_ac27_errors_leave_no_partial_mutation` (serviço) |
-| AC-33 | `test_ac33_slow_v1_does_not_overwrite_v2` | v1 chega depois da v2 e fica `superseded`, sem sobrescrever; v2 é aplicada; resultado de uma foto de tentativa antiga fica `superseded` e a questão nova não herda a análise | `test_ac33_slow_v1_does_not_overwrite_v2` e `test_ac33_result_after_attempt_changed_is_superseded` em `test_session_analysis.py` (serviço) |
+| AC-33 | `test_ac33_slow_v1_does_not_overwrite_v2` | v1 chega depois da v2 e fica `superseded`, sem sobrescrever; v2 é aplicada; resultado de uma foto de tentativa antiga fica `superseded` e a questão nova não herda a análise. Na jornada normal toda saída da captura já supersede o job; por isso um segundo caso reabre o job à força (`queued`) e prova que o resultado da tentativa antiga ainda é recusado (guarda de vigência/tentativa), sem alterar o snapshot | `test_ac33_slow_v1_does_not_overwrite_v2` e `test_ac33_result_after_attempt_changed_is_superseded` em `test_session_analysis.py` (serviço) |
 | AC-36 | `test_ac36_lost_response_is_replayed_and_state_is_reconcilable` | resposta perdida e corpo reenviado: replay, peça movida uma vez; `GET` do snapshot e `GET /events?after_seq=` concordam sobre o estado confirmado | `test_replay_after_revision_advanced_returns_original` |
-| AC-37 | `test_ac37_pause_defers_and_closed_session_discards` | pausa: resultado fica `deferred`, sem mudança nem evento, e a retomada o aplica numa só revisão (`session_resumed` + `analysis_completed`); sessão fechada: resultado tardio descartado, nada muda; tutor recusado em sessão pausada e em fechada (403 `ACTION_NOT_ALLOWED`) | `test_ac37_*` em `test_session_analysis.py` |
+| AC-37 | `test_ac37_pause_defers_and_closed_session_discards` | pausa: resultado fica `deferred`, sem mudança nem evento, e a retomada o aplica numa só revisão (`session_resumed` + `analysis_completed`); controle positivo (sessão ativa: o mesmo resultado é aplicado); sessão fechada: resultado tardio descartado e job encerrado, nada muda; tutor recusado em sessão pausada e em fechada (403 `ACTION_NOT_ALLOWED`) | `test_ac37_*` em `test_session_analysis.py` |
 | AC-38 | `test_ac38_second_tab_takes_control_without_forking_state` | `claim-control` sobe a geração para 2; a aba A perde escrita e ACK (403 `CONTROL_LOST`); as duas abas leem o mesmo estado; a aba B continua escrevendo | `test_ac38_second_tab_takes_control`; `test_concurrent_claims_have_one_winner` |
 | AC-40 | `test_ac40_credential_of_a_sees_nothing_of_b` | token da sessão A nas cinco rotas da sessão B (snapshot, comandos com `command_id` conhecido de B, `claim-control`, ACK, eventos): 404 idêntico byte a byte ao de sessão inexistente, sem o id de B; B não muda | `test_ac40_token_a_on_session_b`; `test_ac40_service_token_on_missing_session_is_the_same_404`; `test_ac40_service_level_cross_session` (serviço) |
 

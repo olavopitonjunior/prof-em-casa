@@ -17,9 +17,11 @@ from app.domain.division.demonstration import demo_steps
 from app.domain.division.observation import NotebookObservation
 from app.sessions.context import ActorContext
 from app.sessions.credentials import hash_token
+from app.sessions.repository import analysis_jobs
 from fastapi.testclient import TestClient
 from helpers import T12_4, cmd, load_raw
 from integration.conftest import VERSION, request_id
+from sqlalchemy import update
 
 pytestmark = pytest.mark.acceptance
 
@@ -65,7 +67,7 @@ class Tab:
 
     # -- cabeçalhos e leituras --
     def headers(self, token=None, controller="own") -> dict:
-        h = {"Authorization": f"Bearer {token or self.token}"}
+        h = {"Authorization": f"Bearer {token or self.token}", "Content-Type": "application/json"}
         controller = self.controller if controller == "own" else controller
         if controller:
             h["X-Controller-Id"] = controller
@@ -237,7 +239,7 @@ def test_ac27_rejections_name_the_code_and_leave_no_trace(client, svc, db_url):
 
 
 @pytest.mark.ac("AC-33")
-def test_ac33_slow_v1_does_not_overwrite_v2(client, svc, db_url):
+def test_ac33_slow_v1_does_not_overwrite_v2(client, svc, engine, db_url):
     tab = Tab(client, svc, 1).to_capture()
     v1 = tab.submit("up-1")
     tab.send(cmd("retake_notebook_photo"))
@@ -264,6 +266,18 @@ def test_ac33_slow_v1_does_not_overwrite_v2(client, svc, db_url):
     assert snap["phase"] == "transfer" and snap["active_attempt_id"] != stale_obs.attempt_id
     assert svc.complete_analysis(WORKER, v3["job_id"], stale_obs) == "superseded"
     assert tab.snapshot() == snap and snap["analysis"] is None  # não vaza para o item novo
+
+    # isola a guarda de tentativa: na jornada normal toda saída da captura já supersede o job
+    # (acima), então só um job reaberto à força (`queued`) chega ao teste de vigência. Aí o
+    # resultado da tentativa antiga ainda precisa ser rejeitado, sem tocar o item novo.
+    with engine.begin() as conn:
+        conn.execute(
+            update(analysis_jobs)
+            .where(analysis_jobs.c.job_id == v3["job_id"])
+            .values(status="queued", applied=False)
+        )
+    assert svc.complete_analysis(WORKER, v3["job_id"], stale_obs) == "superseded"
+    assert tab.snapshot() == snap and snap["analysis"] is None
 
 
 # --- AC-36 ---------------------------------------------------------------------------------------
@@ -307,6 +321,13 @@ def test_ac37_pause_defers_and_closed_session_discards(client, svc, db_url):
     events = tab.events(paused["last_event_seq"])
     assert types(events) == ["session_resumed", "analysis_completed"]
     assert tab.snapshot()["analysis"]["status"] == "available"
+
+    # controle positivo: sem pausa nem fechamento o mesmo resultado entra (o descarte abaixo
+    # não é vácuo)
+    live = Tab(client, svc, 4).to_capture()
+    live_sub = live.submit("up-1")
+    assert live.complete(live_sub) == "applied"
+    assert live.snapshot()["analysis"]["status"] == "available"
 
     # fechada: resultado tardio não entra e nada muda
     other = Tab(client, svc, 2).to_capture()
@@ -418,5 +439,7 @@ def test_ac40_credential_of_a_sees_nothing_of_b(client, svc, db_url):
         assert foreign.json() == {"error": {"code": "NOT_FOUND", "retryable": False}}
         assert b.sid not in foreign.text
     assert b.snapshot() == b_before  # as tentativas não mexeram em B
-    # o token de serviço enxerga as duas sessões; o do aluno só a própria
-    assert client.get(b.url, headers={"Authorization": f"Bearer {TUTOR_TOKEN}"}).status_code == 200
+    # o token de serviço enxerga qualquer sessão (A e B); o do aluno só a própria
+    service = {"Authorization": f"Bearer {TUTOR_TOKEN}"}
+    assert client.get(a.url, headers=service).status_code == 200
+    assert client.get(b.url, headers=service).status_code == 200
