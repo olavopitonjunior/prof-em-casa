@@ -4,7 +4,7 @@ Registro das decisões tomadas durante a execução por subagentes em 05/11/2026
 
 ## Decisões aprovadas pelo usuário
 
-- D1: repositório novo em `~/dev/tutor-divisao`.
+- D1: repositório novo em `~/dev/prof-em-casa`.
 - D2: nota da explicação chega pré-avaliada; o domínio avalia só a modalidade artefato.
 - D3: `request_help.kind` inclui `virtual_objects` e `reference_model` (acrescentam recurso sem subir o nível de assistência).
 

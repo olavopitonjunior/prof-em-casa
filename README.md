@@ -1,6 +1,6 @@
-# tutor-divisao
+# Prof em Casa
 
-Tutor de estudo para alunos do 4º e 5º ano que transforma uma atividade da apostila em uma aula interativa. Projeto inscrito no Hack Brasil 2026 (trilha Acesso à educação).
+Tutor de estudo para alunos do 4º e 5º ano que transforma uma atividade da apostila em uma aula interativa, começando por divisão exata por partilha. Projeto inscrito no Hack Brasil 2026 (trilha Acesso à educação).
 
 > Em desenvolvimento. Nada aqui foi testado com crianças, e nenhum ganho de aprendizagem foi medido. Todos os dados de exemplo são sintéticos.
 

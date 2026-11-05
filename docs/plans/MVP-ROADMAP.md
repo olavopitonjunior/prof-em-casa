@@ -28,7 +28,7 @@ Oportunidades:
   - Voz no navegador (Web Speech API) como canal inicial.
   - O adapter LiveKit entra quando houver conta.
 - G6 Deploy: frontend na Vercel. O backend tem o destino decidido no incremento 6, conforme custo e latência.
-- G7 Segredos em `op://Personal/tutor-divisao/<VAR>`. `.env` gerado por `op inject` e nunca commitado.
+- G7 Segredos em `op://Personal/prof-em-casa/<VAR>`. `.env` gerado por `op inject` e nunca commitado.
 
 ## Ordem
 

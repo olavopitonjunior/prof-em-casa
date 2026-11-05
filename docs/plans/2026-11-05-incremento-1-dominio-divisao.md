@@ -14,7 +14,7 @@
 
 | # | Decisão | Default deste plano | Se você discordar |
 |---|---|---|---|
-| D1 | Repositório | Novo e público, `~/dev/tutor-divisao` (GitHub `tutor-divisao`), criado depois de 04/11 21h. A pasta de discovery não vira repositório de código | Trocar o nome no Task 1; nada mais muda |
+| D1 | Repositório | Novo e público, `~/dev/prof-em-casa` (GitHub `prof-em-casa`), criado depois de 04/11 21h. A pasta de discovery não vira repositório de código | Trocar o nome no Task 1; nada mais muda |
 | D2 | Avaliador da explicação | O domínio recebe um `ExplanationResult` pronto. Ele só avalia sozinho a modalidade `artifact`, a partir da `Verification` do desenho. Texto e voz passam por uma porta `ExplanationEvaluator` (Protocol), com stub nos testes; o LLM entra no incremento 5 | Se a v1 usar rubrica por toque, o Task 6 ganha `evaluate_choice_explanation` |
 | D3 | Lacuna "pedir objetos na questão nova" | `request_help.kind` ganha `virtual_objects` e `reference_model`. Eles adicionam recurso (`support_resources`) sem subir o `assistance_level`; mesmo assim, a classificação cai em `applied_with_support` | Alterar o enum no Task 7 |
 | D4 | `alternate_strategy` na questão nova | Rejeitado com `UNSUPPORTED_CONTENT` (422), porque só existe roteiro 20+4 para o item 24÷4 | Escrever roteiro para 20÷5 no conteúdo |
