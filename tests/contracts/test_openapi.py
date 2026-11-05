@@ -54,3 +54,17 @@ def test_openapi_command_refs_resolve_and_no_default_422():
         for path in spec["paths"].values()
         for op in path.values()
     )
+
+
+def test_openapi_error_code_is_an_enum_and_create_has_no_auth_errors():
+    from app.api.errors import HTTP_STATUS
+
+    spec = create_app(fake_service()).openapi()
+    body = spec["components"]["schemas"]["ErrorBody"]
+    assert set(body["properties"]["code"]["enum"]) == set(HTTP_STATUS)
+    assert "tutor" in body["properties"]["detail"]["description"]
+    create = spec["paths"]["/v1/sessions"]["post"]["responses"]
+    assert {"401", "403", "404"}.isdisjoint(create)
+    assert {"201", "400", "413"} <= set(create)
+    assert {"401", "404"} <= set(spec["paths"]["/v1/sessions/{session_id}"]["get"]["responses"])
+    assert "Idempotent-Replay" in create["201"]["headers"]

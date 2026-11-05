@@ -7,6 +7,7 @@ O cluster nasce sob `tmp_path_factory` (nunca em /tmp), escuta só em 127.0.0.1 
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import socket
@@ -15,6 +16,7 @@ import threading
 import uuid
 import warnings
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -22,9 +24,14 @@ from pathlib import Path
 import pytest
 from app.content.loader import load_content
 from app.db.engine import create_schema, make_engine
+from app.db.schema import attempts, command_results, session_events, sessions
+from app.domain.division.demonstration import demo_steps
+from app.sessions import repository
+from app.sessions.context import ActorContext
 from app.sessions.service import SessionService
-from helpers import StubEvaluator
-from sqlalchemy import Engine, text
+from helpers import T12_4, StubEvaluator, cmd
+from helpers import _raw as raw_command
+from sqlalchemy import Engine, select, text
 
 TEMPLATE_DB = "template_tutor"
 HOMEBREW_BIN = Path("/opt/homebrew/bin")
@@ -246,3 +253,105 @@ def make_service(clock: FakeClock) -> Callable[..., SessionService]:
 @pytest.fixture
 def svc(engine: Engine, make_service: Callable[..., SessionService]) -> SessionService:
     return make_service(engine)
+
+
+# --- Apoio compartilhado dos testes de sessão e da API HTTP ------------------------------------
+
+VERSION = "division-sharing-v1"
+SYSTEM = ActorContext("system", "system-service", None, None)
+
+
+def request_id(n: int) -> str:
+    return f"request-id-{n:08d}-abcdefgh"
+
+
+def learner_ctx(created) -> ActorContext:
+    return ActorContext("learner", created.session_id, created.session_id, created.controller_id)
+
+
+def state_of(svc: SessionService, sid: str):
+    with svc.engine.connect() as conn:
+        row = repository.load_session(conn, sid, for_update=False)
+    assert row is not None
+    return row.state
+
+
+def body_of(state, c, **over) -> bytes:
+    """Corpo cru de um comando de teste, completado a partir do estado real da sessão."""
+    return json.dumps({**raw_command(state, c), **over}).encode()
+
+
+def send(svc: SessionService, ctx: ActorContext, sid: str, c, **over):
+    return svc.execute_command(ctx, sid, body_of(state_of(svc, sid), c, **over))
+
+
+def start_practice(svc: SessionService, n: int = 1):
+    """Sessão criada pelo serviço e levada à prática por comandos reais (aluno e sistema)."""
+    created = svc.create_session(request_id(n), VERSION)
+    ctx, sid = learner_ctx(created), created.session_id
+    send(svc, ctx, sid, cmd("choose_reference_activity"))
+    for step in demo_steps(T12_4, 3)[:12]:
+        send(svc, SYSTEM, sid, cmd("run_demo_step", actor="system", step_id=step.step_id))
+    send(svc, SYSTEM, sid, cmd("finish_demonstration", actor="system", reason="completed"))
+    assert state_of(svc, sid).phase == "practice"
+    return ctx, sid
+
+
+def move_body(
+    svc, sid, *, rev, scene_rev, cmd_id, piece="piece-01", frm="available", to="group-1", **over
+) -> bytes:
+    return json.dumps(
+        {
+            "schema_version": "1.0",
+            "command_id": cmd_id,
+            "session_id": sid,
+            "attempt_id": state_of(svc, sid).active_attempt_id,
+            "expected_revision": rev,
+            "expected_scene_revision": scene_rev,
+            "type": "move_piece",
+            "payload": {"piece_id": piece, "from_location": frm, "to_location": to},
+            **over,
+        }
+    ).encode()
+
+
+def revisions(svc, sid) -> tuple[int, int]:
+    state = state_of(svc, sid)
+    return state.revision, state.scene_revision
+
+
+def event_rows(engine, sid, type_: str | None = None, *, after: int = -1) -> list[dict]:
+    query = select(session_events).where(
+        session_events.c.session_id == sid, session_events.c.revision > after
+    )
+    if type_ is not None:
+        query = query.where(session_events.c.type == type_)
+    with engine.connect() as conn:
+        return [
+            dict(r) for r in conn.execute(query.order_by(session_events.c.event_seq)).mappings()
+        ]
+
+
+def run_parallel(n: int, fn):
+    """Roda `fn(i)` em `n` threads largando juntas; devolve resultados ou exceções, em ordem."""
+    barrier = threading.Barrier(n)
+
+    def job(i):
+        barrier.wait(timeout=30)
+        try:
+            return fn(i)
+        except Exception as exc:  # noqa: BLE001 - o teste inspeciona cada resultado
+            return exc
+
+    with ThreadPoolExecutor(n) as pool:
+        return list(pool.map(job, range(n)))
+
+
+def dump_tables(engine, sid) -> dict:
+    out = {}
+    with engine.connect() as conn:
+        for table in (sessions, session_events, command_results, attempts):
+            query = select(table).where(table.c.session_id == sid)
+            query = query.order_by(*table.primary_key.columns)
+            out[table.name] = [dict(r) for r in conn.execute(query).mappings()]
+    return out

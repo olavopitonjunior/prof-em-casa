@@ -12,17 +12,9 @@ from app.db.schema import analysis_jobs, artifacts, command_results, observation
 from app.domain.division.observation import NotebookObservation
 from app.sessions.context import ActorContext
 from app.sessions.errors import SessionError
+from conftest import SYSTEM, body_of, dump_tables, event_rows, send, start_practice, state_of
 from helpers import cmd, load_raw
 from sqlalchemy import func, select
-from test_session_commands import (
-    SYSTEM,
-    body_of,
-    dump_tables,
-    event_rows,
-    send,
-    start_practice,
-    state_of,
-)
 
 WORKER = ActorContext("vision_worker", "vision_worker-service", None, None)
 TUTOR = ActorContext("tutor", "tutor-service", None, None)

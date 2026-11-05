@@ -10,16 +10,15 @@ from typing import get_args
 
 import pytest
 from app.api.app import create_app
-from app.api.errors import HTTP_STATUS, RETRYABLE, error_body
+from app.api.errors import HTTP_STATUS, MAX_BODY_BYTES, RETRYABLE, error_body, error_response
+from app.db.schema import sessions
 from app.domain.division.errors import DomainError, ErrorCode
 from app.sessions.context import ActorContext
 from app.sessions.credentials import derive_session_token, hash_token
 from app.sessions.errors import SessionError
 from app.sessions.evaluator import UnavailableEvaluator
-from conftest import TOKEN_SECRET
-from fastapi.testclient import TestClient
-from helpers import cmd
-from test_session_commands import (
+from conftest import (
+    TOKEN_SECRET,
     VERSION,
     body_of,
     move_body,
@@ -29,6 +28,9 @@ from test_session_commands import (
     start_practice,
     state_of,
 )
+from fastapi.testclient import TestClient
+from helpers import cmd
+from sqlalchemy import func, select
 
 TUTOR_TOKEN = "fake-tutor-service-token-for-tests-only"
 SYSTEM_TOKEN = "fake-system-service-token-for-tests-only"
@@ -97,7 +99,8 @@ def fresh_move(svc, p: Practice, cmd_id="c-move-1", **over) -> bytes:
 
 
 def test_every_error_code_has_a_status_and_the_tables_match_the_spec():
-    assert set(HTTP_STATUS) == set(get_args(ErrorCode))
+    assert set(HTTP_STATUS) == set(get_args(ErrorCode)) | {"PAYLOAD_TOO_LARGE", "INTERNAL_ERROR"}
+    assert HTTP_STATUS["PAYLOAD_TOO_LARGE"] == 413 and HTTP_STATUS["INTERNAL_ERROR"] == 500
     assert HTTP_STATUS["STALE_TURN"] == 409 and "STALE_TURN" not in RETRYABLE  # extensão R30
     assert RETRYABLE == {
         "STALE_REVISION",
@@ -521,3 +524,130 @@ def test_stale_tutor_turn_is_409_not_retryable(client, svc, practice):
     r = client.post(practice.cmd_url, content=json.dumps(raw).encode(), headers=auth(TUTOR_TOKEN))
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "STALE_TURN" and r.json()["error"]["retryable"] is False
+
+
+# --- STALE_SCENE e os status sem rota que os emita -----------------------------------------------
+
+
+def test_stale_scene_is_409_retryable(client, svc, practice):
+    R, S = revisions(svc, practice.sid)
+    body = move_body(svc, practice.sid, rev=R, scene_rev=S - 1, cmd_id="c-stale-scene")
+    r = client.post(practice.cmd_url, content=body, headers=practice.headers)
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "STALE_SCENE" and r.json()["error"]["retryable"] is True
+    assert revision(client, practice) == R
+
+
+@pytest.mark.parametrize(
+    "code,status", [("UNSUPPORTED_IMAGE", 415), ("IMAGE_TOO_LARGE", 413), ("SESSION_LIMIT", 429)]
+)
+def test_error_response_status_for_codes_without_a_route(code, status):
+    """Nenhuma rota do incremento 2 emite estes códigos; o mapeamento e o envelope valem assim
+    mesmo. O detalhe do domínio fica fora do corpo do aluno."""
+    response = error_response(DomainError(code, "secret domain text"))
+    assert response.status_code == status
+    assert json.loads(response.body) == {"error": {"code": code, "retryable": False}}
+
+
+# --- R31: tamanho do corpo -----------------------------------------------------------------------
+
+TOO_LARGE = {"error": {"code": "PAYLOAD_TOO_LARGE", "retryable": False}}
+
+
+def session_count(svc) -> int:
+    with svc.engine.connect() as conn:
+        return conn.execute(select(func.count()).select_from(sessions)).scalar_one()
+
+
+def padded(base: bytes, size: int) -> bytes:
+    """Mesmo JSON com um campo de enchimento, do tamanho exato pedido."""
+    obj = json.loads(base)
+    obj["padding"] = ""
+    overhead = len(json.dumps(obj).encode())
+    obj["padding"] = "x" * (size - overhead)
+    out = json.dumps(obj).encode()
+    assert len(out) == size
+    return out
+
+
+def test_oversized_command_body_is_413_without_mutation(client, svc, practice):
+    R = revision(client, practice)
+    big = padded(fresh_move(svc, practice), MAX_BODY_BYTES + 1)
+    r = client.post(practice.cmd_url, content=big, headers=practice.headers)
+    assert r.status_code == 413 and r.json() == TOO_LARGE
+    assert revision(client, practice) == R
+
+
+def test_chunked_oversized_body_without_content_length_is_413(client, svc, practice):
+    R = revision(client, practice)
+    big = padded(fresh_move(svc, practice), MAX_BODY_BYTES * 4)
+
+    def chunks():
+        for i in range(0, len(big), 8192):
+            yield big[i : i + 8192]
+
+    r = client.post(practice.cmd_url, content=chunks(), headers=practice.headers)
+    assert r.status_code == 413 and r.json() == TOO_LARGE
+    assert revision(client, practice) == R
+
+
+def test_body_at_the_limit_still_reaches_the_validation(client, svc, practice):
+    at_limit = padded(fresh_move(svc, practice), MAX_BODY_BYTES)
+    r = client.post(practice.cmd_url, content=at_limit, headers=practice.headers)
+    assert r.status_code == 400 and r.json()["error"]["code"] == "INVALID_PAYLOAD"  # campo extra
+
+
+def test_oversized_create_session_is_413_and_creates_nothing(client, svc):
+    body = {"request_id": request_id(1), "content_version": VERSION}
+    big = padded(json.dumps(body).encode(), MAX_BODY_BYTES + 1)
+    r = client.post("/v1/sessions", content=big, headers={"Content-Type": "application/json"})
+    assert r.status_code == 413 and r.json() == TOO_LARGE
+    assert session_count(svc) == 0
+
+
+def test_oversized_body_is_cut_before_authentication(client, practice):
+    r = client.post(practice.cmd_url, content=b"x" * (MAX_BODY_BYTES + 1))
+    assert r.status_code == 413 and r.json() == TOO_LARGE
+
+
+# --- I2: nada do que o cliente mandou volta sem validar ------------------------------------------
+
+
+@pytest.mark.parametrize("bad", ["x" * 60_000, "my secret id", "ñ", "a\nb", "id/with/slash"])
+def test_unvalidated_command_id_is_never_echoed(client, svc, practice, bad):
+    raw = json.loads(fresh_move(svc, practice))
+    raw["command_id"] = bad
+    r = client.post(practice.cmd_url, content=json.dumps(raw).encode(), headers=practice.headers)
+    assert r.status_code == 400 and r.json() == {
+        "error": {"code": "INVALID_PAYLOAD", "retryable": False}
+    }
+    assert len(r.content) < 200 and bad not in r.text
+
+
+def test_valid_command_id_is_still_echoed(client, svc, practice):
+    R, S = revisions(svc, practice.sid)
+    body = move_body(svc, practice.sid, rev=R - 1, scene_rev=S, cmd_id="c-ok_1.2:3")
+    r = client.post(practice.cmd_url, content=body, headers=practice.headers)
+    assert r.json()["command_id"] == "c-ok_1.2:3"
+
+
+def test_one_megabyte_command_id_is_cut_small(client, svc, practice):
+    raw = json.loads(fresh_move(svc, practice))
+    raw["command_id"] = "x" * 1_000_000
+    r = client.post(practice.cmd_url, content=json.dumps(raw).encode(), headers=practice.headers)
+    assert r.status_code == 413 and len(r.content) < 200
+
+
+# --- erro inesperado -----------------------------------------------------------------------------
+
+
+def test_unexpected_exception_is_500_in_the_envelope_without_detail(svc, practice, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom with a secret: 4 grupos de 6")
+
+    monkeypatch.setattr(svc, "get_snapshot", boom)
+    with TestClient(create_app(svc), raise_server_exceptions=False) as client:
+        r = client.get(practice.sess_url, headers=practice.headers)
+    assert r.status_code == 500
+    assert r.json() == {"error": {"code": "INTERNAL_ERROR", "retryable": False}}
+    assert "boom" not in r.text and "secret" not in r.text

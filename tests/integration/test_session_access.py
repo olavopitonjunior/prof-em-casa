@@ -15,12 +15,9 @@ from app.sessions.credentials import derive_session_token, hash_token
 from app.sessions.errors import SessionError
 from app.sessions.projection import FORBIDDEN_LEARNER_KEYS
 from app.sessions.receipts import RenderReceipt, parse_render_receipt
-from conftest import TOKEN_SECRET
-from helpers import T12_4, cmd
-from helpers import _raw as raw_command
-from sqlalchemy import func, select
-from test_session_commands import (
+from conftest import (
     SYSTEM,
+    TOKEN_SECRET,
     VERSION,
     body_of,
     event_rows,
@@ -32,6 +29,9 @@ from test_session_commands import (
     start_practice,
     state_of,
 )
+from helpers import T12_4, cmd
+from helpers import _raw as raw_command
+from sqlalchemy import func, select
 
 RID_B = "tab-b-request-id-0000000002"
 RID_C = "tab-c-request-id-0000000003"

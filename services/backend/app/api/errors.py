@@ -7,7 +7,8 @@ revisões atuais, `command_id`). O texto de detalhe do domínio nunca sai para e
 
 from __future__ import annotations
 
-from typing import get_args
+import re
+from typing import Literal, get_args
 
 from fastapi.responses import JSONResponse
 
@@ -15,7 +16,14 @@ from app.domain.division.errors import DomainError, ErrorCode
 from app.sessions.errors import SessionError
 from app.sessions.projection import Audience
 
-HTTP_STATUS: dict[ErrorCode, int] = {
+# Códigos que só existem na borda HTTP (não nascem no domínio nem no serviço).
+#  - PAYLOAD_TOO_LARGE: decisão R31, corpo acima de MAX_BODY_BYTES (a Spec só tem 413 para imagem).
+#  - INTERNAL_ERROR: exceção não prevista; o corpo nunca leva a causa.
+ApiErrorCode = Literal[*get_args(ErrorCode), "PAYLOAD_TOO_LARGE", "INTERNAL_ERROR"]
+
+MAX_BODY_BYTES = 64 * 1024  # R31: nenhum comando, ACK ou criação chega perto disso
+
+HTTP_STATUS: dict[ApiErrorCode, int] = {
     "INVALID_PAYLOAD": 400,
     "UNAUTHENTICATED": 401,
     "ACTION_NOT_ALLOWED": 403,
@@ -34,10 +42,13 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     "UNSUPPORTED_CONTENT": 422,
     "SESSION_LIMIT": 429,
     "PROVIDER_UNAVAILABLE": 503,
+    "PAYLOAD_TOO_LARGE": 413,
+    "INTERNAL_ERROR": 500,
 }
-assert set(HTTP_STATUS) == set(get_args(ErrorCode))  # código novo sem status é erro de import
+if not set(get_args(ErrorCode)) <= set(HTTP_STATUS):  # código novo sem status é erro de import
+    raise RuntimeError("HTTP_STATUS does not cover every ErrorCode")
 
-RETRYABLE: frozenset[ErrorCode] = frozenset(
+RETRYABLE: frozenset[ApiErrorCode] = frozenset(
     {
         "STALE_REVISION",
         "STALE_SCENE",
@@ -48,6 +59,17 @@ RETRYABLE: frozenset[ErrorCode] = frozenset(
 )
 
 
+# Só o que parece um id volta ao cliente: alfabeto curto e tamanho limitado. Texto livre, espaço,
+# acento ou um valor de 1 MB nunca é refletido (nem amplifica a resposta).
+_ECHOABLE_ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
+
+
+def code_response(code: ApiErrorCode) -> JSONResponse:
+    """Envelope sem nada do pedido: para erros da borda (corpo grande, falha interna)."""
+    body = {"error": {"code": code, "retryable": code in RETRYABLE}}
+    return JSONResponse(body, status_code=HTTP_STATUS[code])
+
+
 def error_body(err: SessionError | DomainError, audience: Audience = "learner") -> dict:
     fields: dict = {"code": err.code, "retryable": err.code in RETRYABLE}
     body: dict = {"error": fields}
@@ -56,7 +78,7 @@ def error_body(err: SessionError | DomainError, audience: Audience = "learner") 
             fields["current_revision"] = err.current_revision
         if err.current_scene_revision is not None:
             fields["current_scene_revision"] = err.current_scene_revision
-        if err.command_id is not None:
+        if err.command_id is not None and _ECHOABLE_ID.fullmatch(err.command_id):
             body = {"command_id": err.command_id, "error": fields}
     if audience == "service" and err.detail:
         fields["detail"] = err.detail

@@ -1407,6 +1407,28 @@
       "ErrorBody": {
         "properties": {
           "code": {
+            "enum": [
+              "INVALID_PAYLOAD",
+              "UNAUTHENTICATED",
+              "ACTION_NOT_ALLOWED",
+              "CONTROL_LOST",
+              "NOT_FOUND",
+              "STALE_REVISION",
+              "STALE_SCENE",
+              "STALE_TURN",
+              "ATTEMPT_CHANGED",
+              "IDEMPOTENCY_CONFLICT",
+              "INVALID_TRANSITION",
+              "IMAGE_TOO_LARGE",
+              "UNSUPPORTED_IMAGE",
+              "INVALID_SCENE",
+              "NO_OP",
+              "UNSUPPORTED_CONTENT",
+              "SESSION_LIMIT",
+              "PROVIDER_UNAVAILABLE",
+              "PAYLOAD_TOO_LARGE",
+              "INTERNAL_ERROR"
+            ],
             "title": "Code",
             "type": "string"
           },
@@ -1441,6 +1463,7 @@
                 "type": "null"
               }
             ],
+            "description": "Só para tutor e atores de serviço (R29); o aluno nunca recebe este campo.",
             "title": "Detail"
           },
           "retryable": {
@@ -1466,6 +1489,7 @@
                 "type": "null"
               }
             ],
+            "description": "Eco do id do comando, só quando ele tem formato válido.",
             "title": "Command Id"
           },
           "error": {
@@ -3737,7 +3761,18 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotent-Replay": {
+                "description": "`true` quando a resposta repete o resultado já gravado.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -3749,46 +3784,6 @@
             },
             "description": "INVALID_PAYLOAD"
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "UNAUTHENTICATED"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "ACTION_NOT_ALLOWED, CONTROL_LOST"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, IDEMPOTENCY_CONFLICT, INVALID_TRANSITION"
-          },
           "413": {
             "content": {
               "application/json": {
@@ -3797,17 +3792,7 @@
                 }
               }
             },
-            "description": "IMAGE_TOO_LARGE"
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "UNSUPPORTED_IMAGE"
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
           },
           "422": {
             "content": {
@@ -3829,7 +3814,7 @@
             },
             "description": "SESSION_LIMIT"
           },
-          "503": {
+          "500": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3837,7 +3822,7 @@
                 }
               }
             },
-            "description": "PROVIDER_UNAVAILABLE"
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Cria a sessão (ou devolve a mesma, no replay do request_id)"
@@ -3960,7 +3945,7 @@
                 }
               }
             },
-            "description": "IMAGE_TOO_LARGE"
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
           },
           "415": {
             "content": {
@@ -3991,6 +3976,16 @@
               }
             },
             "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           },
           "503": {
             "content": {
@@ -4131,7 +4126,7 @@
                 }
               }
             },
-            "description": "IMAGE_TOO_LARGE"
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
           },
           "415": {
             "content": {
@@ -4162,6 +4157,16 @@
               }
             },
             "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           },
           "503": {
             "content": {
@@ -4368,7 +4373,18 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotent-Replay": {
+                "description": "`true` quando a resposta repete o resultado já gravado.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -4428,7 +4444,7 @@
                 }
               }
             },
-            "description": "IMAGE_TOO_LARGE"
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
           },
           "415": {
             "content": {
@@ -4459,6 +4475,16 @@
               }
             },
             "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           },
           "503": {
             "content": {
@@ -4600,7 +4626,7 @@
                 }
               }
             },
-            "description": "IMAGE_TOO_LARGE"
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
           },
           "415": {
             "content": {
@@ -4631,6 +4657,16 @@
               }
             },
             "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           },
           "503": {
             "content": {
@@ -4771,7 +4807,7 @@
                 }
               }
             },
-            "description": "IMAGE_TOO_LARGE"
+            "description": "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE"
           },
           "415": {
             "content": {
@@ -4802,6 +4838,16 @@
               }
             },
             "description": "SESSION_LIMIT"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           },
           "503": {
             "content": {

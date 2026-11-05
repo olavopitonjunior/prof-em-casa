@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+
+from app.api.errors import ApiErrorCode
 
 
 class _Strict(BaseModel):
@@ -60,13 +62,18 @@ class EventsResponse(BaseModel):
 
 
 class ErrorBody(BaseModel):
-    code: str
+    code: ApiErrorCode
     retryable: bool
     current_revision: int | None = None
     current_scene_revision: int | None = None
-    detail: str | None = None
+    detail: str | None = Field(
+        default=None,
+        description="Só para tutor e atores de serviço (R29); o aluno nunca recebe este campo.",
+    )
 
 
 class ErrorEnvelope(BaseModel):
-    command_id: str | None = None
+    command_id: str | None = Field(
+        default=None, description="Eco do id do comando, só quando ele tem formato válido."
+    )
     error: ErrorBody

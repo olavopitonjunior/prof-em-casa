@@ -29,34 +29,48 @@ REPLAY_HEADER = "Idempotent-Replay"
 Service = Annotated[SessionService, Depends(get_service)]
 Ctx = Annotated[ActorContext, Depends(get_ctx)]
 
-_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    status: {"model": ErrorEnvelope, "description": description}
-    for status, description in {
-        400: "INVALID_PAYLOAD",
-        401: "UNAUTHENTICATED",
-        403: "ACTION_NOT_ALLOWED, CONTROL_LOST",
-        404: "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)",
-        409: "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, "
-        "IDEMPOTENCY_CONFLICT, INVALID_TRANSITION",
-        413: "IMAGE_TOO_LARGE",
-        415: "UNSUPPORTED_IMAGE",
-        422: "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT",
-        429: "SESSION_LIMIT",
-        503: "PROVIDER_UNAVAILABLE",
-    }.items()
+_DESCRIPTIONS: dict[int, str] = {
+    400: "INVALID_PAYLOAD",
+    401: "UNAUTHENTICATED",
+    403: "ACTION_NOT_ALLOWED, CONTROL_LOST",
+    404: "NOT_FOUND (sessão inexistente, expirada ou de outra credencial)",
+    409: "STALE_REVISION, STALE_SCENE, STALE_TURN, ATTEMPT_CHANGED, "
+    "IDEMPOTENCY_CONFLICT, INVALID_TRANSITION",
+    413: "PAYLOAD_TOO_LARGE (corpo acima de 64 KiB) ou IMAGE_TOO_LARGE",
+    415: "UNSUPPORTED_IMAGE",
+    422: "INVALID_SCENE, NO_OP, UNSUPPORTED_CONTENT",
+    429: "SESSION_LIMIT",
+    500: "INTERNAL_ERROR",
+    503: "PROVIDER_UNAVAILABLE",
+}
+
+
+def _errors(*statuses: int) -> dict[int | str, dict[str, Any]]:
+    return {s: {"model": ErrorEnvelope, "description": _DESCRIPTIONS[s]} for s in statuses}
+
+
+# Rotas autenticadas por sessão. A criação não tem credencial nem sessão: sem 401/403/404.
+_SESSION_ERRORS = _errors(400, 401, 403, 404, 409, 413, 415, 422, 429, 500, 503)
+_CREATE_ERRORS = _errors(400, 413, 422, 429, 500)
+_REPLAY_HEADER_DOC = {
+    REPLAY_HEADER: {
+        "description": "`true` quando a resposta repete o resultado já gravado.",
+        "schema": {"type": "string", "enum": ["true"]},
+    }
 }
 
 # O corpo do comando chega cru (para rejeitar chave duplicada e NaN no serviço); o contrato
 # documenta a união discriminada. `$defs` é movido para `components.schemas` em `app.py`.
 COMMAND_SCHEMA = TypeAdapter(Command).json_schema(ref_template="#/components/schemas/{model}")
 
-router = APIRouter(prefix="/v1", responses=_ERROR_RESPONSES)
+router = APIRouter(prefix="/v1")
 
 
 @router.post(
     "/sessions",
     status_code=201,
     response_model=CreatedSessionResponse,
+    responses={**_CREATE_ERRORS, 201: {"headers": _REPLAY_HEADER_DOC}},
     summary="Cria a sessão (ou devolve a mesma, no replay do request_id)",
 )
 def create_session(
@@ -74,7 +88,9 @@ def create_session(
     }
 
 
-@router.get("/sessions/{session_id}", summary="Snapshot público da sessão")
+@router.get(
+    "/sessions/{session_id}", summary="Snapshot público da sessão", responses=_SESSION_ERRORS
+)
 def get_session(session_id: str, service: Service, ctx: Ctx) -> dict[str, Any]:
     return service.get_snapshot(ctx, session_id)
 
@@ -82,6 +98,7 @@ def get_session(session_id: str, service: Service, ctx: Ctx) -> dict[str, Any]:
 @router.post(
     "/sessions/{session_id}/commands",
     response_model=CommandAccepted,
+    responses={**_SESSION_ERRORS, 200: {"headers": _REPLAY_HEADER_DOC}},
     summary="Executa um comando (idempotente por command_id)",
     openapi_extra={
         "requestBody": {
@@ -104,6 +121,7 @@ async def post_command(
 @router.post(
     "/sessions/{session_id}/claim-control",
     response_model=ClaimControlResponse,
+    responses=_SESSION_ERRORS,
     summary="Assume o controle da sessão neste dispositivo",
 )
 def claim_control(
@@ -115,6 +133,7 @@ def claim_control(
 @router.post(
     "/sessions/{session_id}/render-receipts",
     response_model=ReceiptResponse,
+    responses=_SESSION_ERRORS,
     summary="ACK de render (não muda a revisão)",
 )
 def post_render_receipt(
@@ -126,6 +145,7 @@ def post_render_receipt(
 @router.get(
     "/sessions/{session_id}/events",
     response_model=EventsResponse,
+    responses=_SESSION_ERRORS,
     summary="Eventos com event_seq > after_seq, na projeção do ator",
 )
 def list_events(
