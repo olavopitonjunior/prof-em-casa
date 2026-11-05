@@ -22,6 +22,7 @@ def _apply_first(n: int):
     return s
 
 
+@pytest.mark.ac("AC-03")
 def test_ac03_full_demo():
     steps = demo_steps(T12_4, rounds=3)
     assert len(steps) == 12 and steps[0].step_id == "r1-g1"

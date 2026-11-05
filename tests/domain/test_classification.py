@@ -15,17 +15,20 @@ P = ExplanationResult(rating="partial", modality="text", evidence="falou só o t
 U = ExplanationResult(rating="unclear", modality="text", evidence="não relacionou")
 
 
+@pytest.mark.ac("AC-22")
 def test_ac22_applied_without_item_help():
     paper = AssistanceLedger(resources=frozenset({"paper"}))
     assert classify_attempt(True, S, paper) == "applied_without_item_help"
 
 
+@pytest.mark.ac("AC-24")
 def test_accessibility_and_procedural_keep_without_item_help():
     ledger = apply_help_effect(AssistanceLedger(), "procedural", "onde envio?")
     ledger = apply_help_effect(ledger, "accessibility", "fonte maior")
     assert classify_attempt(True, S, ledger) == "applied_without_item_help"
 
 
+@pytest.mark.ac("AC-23")
 def test_ac23_answer_alone_is_partial_evidence():
     assert classify_attempt(True, None, AssistanceLedger()) == "answer_correct_evidence_partial"
 
@@ -37,6 +40,7 @@ def test_partial_or_unclear_explanation_is_partial_evidence(explanation):
     )
 
 
+@pytest.mark.ac("AC-24")
 def test_ac24_objects_make_it_supported():
     ledger = apply_help_effect(AssistanceLedger(), "virtual_objects", "pediu objetos")
     assert classify_attempt(True, S, ledger) == "applied_with_support"

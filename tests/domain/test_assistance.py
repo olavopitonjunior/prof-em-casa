@@ -32,6 +32,7 @@ def test_prompted_can_rise_to_demonstrated():
     assert apply_help_effect(ledger, "alternate_strategy", "outra").level == "demonstrated"
 
 
+@pytest.mark.ac("AC-24")
 def test_procedural_and_accessibility_are_not_help():  # AC-24 (parte)
     ledger = apply_help_effect(AssistanceLedger(), "procedural", "onde envio?")
     ledger = apply_help_effect(ledger, "accessibility", "x")

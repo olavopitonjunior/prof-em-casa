@@ -14,8 +14,12 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["services/backend"]
+pythonpath = ["services/backend", "tests/domain"]
 testpaths = ["tests"]
+markers = [
+    "ac(*ids): critério de aceite (AC-xx) que o teste comprova; ver tests/ac_traceability.py",
+    "acceptance: jornada de aceite que parte de new_session e usa só apply_command",
+]
 
 [tool.ruff]
 line-length = 100

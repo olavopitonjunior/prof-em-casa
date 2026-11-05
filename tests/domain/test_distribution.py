@@ -14,6 +14,7 @@ def _sv(counts):
     return scene, verify_distribution(T24_4, scene)
 
 
+@pytest.mark.ac("AC-05")
 def test_ac05_unequal_7_5_6_6():
     s = scene_with_counts(T24_4, [7, 5, 6, 6])
     v = verify_distribution(T24_4, s)
@@ -28,6 +29,7 @@ def test_ac05_unequal_7_5_6_6():
     assert i.code == "compare_groups" and set(i.target_ids) == {"group-1", "group-2"}
 
 
+@pytest.mark.ac("AC-06")
 def test_ac06_equal_5_5_5_5_with_4_available():
     s = scene_with_counts(T24_4, [5, 5, 5, 5])
     v = verify_distribution(T24_4, s)

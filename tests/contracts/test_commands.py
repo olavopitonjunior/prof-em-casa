@@ -81,6 +81,7 @@ def code_of(raw, actor="learner") -> str:
     return e.value.code
 
 
+@pytest.mark.ac("AC-39")
 @pytest.mark.parametrize(
     "bad",
     [

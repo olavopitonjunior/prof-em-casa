@@ -50,6 +50,7 @@ def test_session_is_frozen():
 # --- AC-03 / AC-04 ----------------------------------------------------------------------------
 
 
+@pytest.mark.ac("AC-03")
 def test_ac03_demo_flow_reaches_practice_without_answer():
     s = run(new_session("s1"), cmd("choose_reference_activity"))
     assert s.phase == "demonstration" and s.revision == 1
@@ -69,6 +70,7 @@ def test_demo_scene_shows_the_demonstrated_answer_only_when_the_script_is_comple
     assert public_snapshot(s, CONTENT)["scene"]["answer_display"] == 3  # Parte II §4, regra 4
 
 
+@pytest.mark.ac("AC-04")
 def test_ac04_finish_before_first_round_rejected_after_allowed():
     s = session_after_demo_steps(3)
     with pytest.raises(DomainError) as e:
@@ -153,6 +155,7 @@ def test_run_demo_step_by_tutor_emits_events():
 # --- AC-05 / AC-06 ----------------------------------------------------------------------------
 
 
+@pytest.mark.ac("AC-05", "AC-06")
 def test_ac05_ac06_check_distribution_keeps_phase():
     s = practice_with_counts([7, 5, 6, 6])
     r = apply(s, cmd("check_distribution"))
@@ -196,6 +199,7 @@ def test_last_event_seq_counts_events():
     assert h.session.last_event_seq == r.session.last_event_seq + len(h.events)
 
 
+@pytest.mark.ac("AC-27")
 @pytest.mark.parametrize(
     "mutation,code",
     [
@@ -371,6 +375,7 @@ def test_notebook_blocks_scene_commands_until_return():
 # --- ajuda (AC-24, D3, D4) ---------------------------------------------------------------------
 
 
+@pytest.mark.ac("AC-21")
 def test_ac21_transfer_starts_clean():
     s = session_in_transfer()
     snap = public_snapshot(s, CONTENT)
@@ -381,6 +386,7 @@ def test_ac21_transfer_starts_clean():
     assert attempt(s, "guided").status == "closed" and attempt(s, "transfer").status == "active"
 
 
+@pytest.mark.ac("AC-24")
 def test_ac24_help_recorded_before_resource():
     s = session_in_transfer()
     r = apply(s, cmd("request_help", kind="virtual_objects", reason="quero peças"))
@@ -440,6 +446,7 @@ def test_help_in_notebook_keeps_the_phase():
 # --- resposta, explicação e classificação (AC-22, AC-23) --------------------------------------
 
 
+@pytest.mark.ac("AC-22", "AC-23")
 def test_ac22_ac23_via_commands():
     s = session_in_transfer()
     a = apply(s, cmd("submit_answer", answer=4))
