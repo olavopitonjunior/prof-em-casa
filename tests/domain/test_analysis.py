@@ -330,20 +330,39 @@ def test_analysis_result_rejects_unknown_fields_and_bad_version():
 
 
 def _revising_pending():
-    """Foto enviada, análise ainda pendente; a criança volta ao caderno (revise_record)."""
+    """Foto enviada, análise pendente; a criança volta ao caderno (revise_record) e a abandona."""
     return run(in_review(), cmd("enter_notebook", intent="revise_record"))
 
 
-def test_r23_recapture_after_revise_supersedes_a_pending_artifact():
-    revising = _revising_pending()
-    assert revising.phase == "notebook" and revising.active_artifact is not None
-    r = apply(revising, cmd("open_notebook_capture"))
+def _pending_artifact(s, **over):
+    """Estado montado à mão com um artefato ainda pendente (nenhuma análise aplicada)."""
+    artifact = {"artifact_id": "art-1", "artifact_version": 1, "job_id": "job-1"}
+    return s.with_changes(active_artifact={**artifact, **over})
+
+
+def test_revise_record_drops_a_pending_artifact_with_one_event():  # R27
+    review = in_review()
+    r = apply(review, cmd("enter_notebook", intent="revise_record"))
+    assert r.session.phase == "notebook"
+    assert [e.type for e in r.events] == ["notebook_entered", "analysis_superseded"]
+    assert r.events[1].data == {
+        "artifact_id": "art-1",
+        "job_id": "job-1",
+        "reason": "revise_record",
+    }
+    assert r.session.active_artifact is None
+    assert r.session.last_event_seq == review.last_event_seq + 2
+
+
+def test_r23_recapture_supersedes_a_leftover_pending_artifact():
+    leftover = _pending_artifact(in_review().with_changes(phase="notebook"))
+    r = apply(leftover, cmd("open_notebook_capture"))
     assert r.session.phase == "notebook_capture"
     assert [e.type for e in r.events] == ["analysis_superseded"]
     assert r.events[0].data == {"artifact_id": "art-1", "job_id": "job-1", "reason": "recapture"}
     assert r.session.active_artifact is None
     assert r.session.observation is None and r.session.verification is None
-    assert r.session.last_event_seq == revising.last_event_seq + 1
+    assert r.session.last_event_seq == leftover.last_event_seq + 1
 
 
 @pytest.mark.ac("AC-33")
@@ -397,10 +416,8 @@ def _transfer_with_photo(*, analyzed: bool):
 
 
 def test_guided_to_transfer_supersedes_a_pending_artifact_once():
-    s = run(in_review(), cmd("enter_notebook", intent="revise_record"))
-    s = run(s, cmd("return_to_activity"))
-    s = run(s, cmd("submit_answer", answer=6))
-    r = apply(s, cmd("continue_after_explanation", reason="learner_skipped"))
+    explanation = _pending_artifact(run(session_in_practice(), cmd("submit_answer", answer=6)))
+    r = apply(explanation, cmd("continue_after_explanation", reason="learner_skipped"))
     types = [e.type for e in r.events]
     assert types == ["attempt_evaluated", "analysis_superseded", "attempt_started", "scene_changed"]
     assert r.events[1].data == {
@@ -413,7 +430,8 @@ def test_guided_to_transfer_supersedes_a_pending_artifact_once():
 
 
 def test_transfer_to_summary_supersedes_a_pending_artifact():
-    s = _transfer_with_photo(analyzed=False)
+    explanation = run(session_in_transfer(), cmd("submit_answer", answer=4))
+    s = _pending_artifact(explanation, artifact_id="art-t", job_id="job-t")
     r = apply(s, cmd("continue_after_explanation", reason="learner_skipped"))
     assert r.session.phase == "summary"
     assert [e.type for e in r.events] == ["attempt_evaluated", "analysis_superseded"]
@@ -428,6 +446,103 @@ def test_transfer_to_summary_keeps_a_completed_analysis_without_an_event():
     r = apply(s, cmd("continue_after_explanation", reason="learner_skipped"))
     assert [e.type for e in r.events] == ["attempt_evaluated"]
     assert r.session.observation is not None and r.session.active_artifact is not None
+
+
+# --- R27: análise pendente só existe em notebook_capture/notebook_review ----------------------
+
+_PENDING_PHASES = {"notebook_capture", "notebook_review"}
+
+
+def _pending_start_states():
+    """Real: foto enviada (notebook_review). Montados à mão: estados em que um artefato pendente
+    sobraria fora da revisão, para provar que nenhuma transição o deixa para trás."""
+    practice = session_in_practice()
+    return {
+        "review": in_review(),
+        "capture": _pending_artifact(in_notebook_capture()),
+        "notebook": _pending_artifact(in_review().with_changes(phase="notebook")),
+        "explanation": _pending_artifact(run(practice, cmd("submit_answer", answer=6))),
+        "practice": _pending_artifact(practice),
+    }
+
+
+_PAYLOAD_VARIANTS = {
+    "enter_notebook": [{"intent": "revise_record"}, {"intent": "record_solution"}],
+}
+
+
+def _is_pending(s) -> bool:
+    return s.active_artifact is not None and s.observation is None
+
+
+def test_no_reachable_state_shows_pending_analysis_outside_capture_and_review():
+    from app.domain.division.commands import ALLOWED_ACTORS
+
+    succeeded: set[tuple[str, str]] = set()
+    for name, start in _pending_start_states().items():
+        assert _is_pending(start)
+        for ctype in sorted(ALLOWED_ACTORS):
+            actor = min(ALLOWED_ACTORS[ctype])
+            for over in _PAYLOAD_VARIANTS.get(ctype, [{}]):
+                try:
+                    r = apply(start, cmd(ctype, actor=actor, **over))
+                except (DomainError, ValueError):
+                    continue  # recusado (fase, payload ou sem handler): o estado não muda
+                succeeded.add((name, ctype))
+                out = r.session
+                assert out.phase in _PENDING_PHASES or not _is_pending(out), (name, ctype)
+                if not _is_pending(out):
+                    dropped = [e for e in r.events if e.type == "analysis_superseded"]
+                    assert len(dropped) == 1, (name, ctype)  # R26: exatamente um
+    # a varredura precisa ter alcançado as saídas que importam
+    for pair in [
+        ("review", "enter_notebook"),
+        ("review", "retake_notebook_photo"),
+        ("review", "close_session"),
+        ("capture", "cancel_capture"),
+        ("capture", "close_session"),
+        ("notebook", "return_to_activity"),
+        ("notebook", "open_notebook_capture"),
+        ("explanation", "return_to_activity"),
+        ("explanation", "continue_after_explanation"),
+        ("practice", "enter_notebook"),
+    ]:
+        assert pair in succeeded, pair
+
+
+@pytest.mark.parametrize(
+    ("start", "command", "reason"),
+    [
+        ("review", cmd("enter_notebook", intent="revise_record"), "revise_record"),
+        ("review", cmd("retake_notebook_photo"), "retake"),
+        ("review", cmd("close_session"), "session_closed"),
+        ("capture", cmd("cancel_capture"), "left_capture"),
+        ("notebook", cmd("return_to_activity"), "left_notebook"),
+        ("explanation", cmd("return_to_activity"), "left_notebook"),
+    ],
+)
+def test_leaving_the_flow_drops_the_pending_artifact_with_a_clear_reason(start, command, reason):
+    r = apply(_pending_start_states()[start], command)
+    dropped = [e for e in r.events if e.type == "analysis_superseded"]
+    assert [e.data["reason"] for e in dropped] == [reason]
+    assert r.session.active_artifact is None
+
+
+def test_pause_keeps_the_pending_artifact_in_review():
+    r = apply(in_review(), cmd("pause_session"))
+    assert r.session.phase == "notebook_review" and _is_pending(r.session)
+    assert [e.type for e in r.events] == ["session_paused"]
+
+
+def test_closing_a_session_with_a_pending_artifact_supersedes_before_the_close_event():
+    r = apply(in_review(), cmd("close_session"))
+    assert [e.type for e in r.events] == [
+        "attempt_evaluated",
+        "analysis_superseded",
+        "session_closed",
+    ]
+    app = apply_analysis_result(r.session, result_for("job-1", "art-1", 1), content=CONTENT)
+    assert app.disposition == "discarded"
 
 
 # --- result só vale na tentativa ativa e numa fase que espera análise -------------------------
@@ -452,7 +567,16 @@ def test_result_for_a_closed_attempt_is_superseded():
 
 
 @pytest.mark.parametrize(
-    "phase", ["correction", "summary", "practice", "transfer", "notebook_capture", "explanation"]
+    "phase",
+    [
+        "notebook",
+        "correction",
+        "summary",
+        "practice",
+        "transfer",
+        "notebook_capture",
+        "explanation",
+    ],
 )
 def test_result_outside_the_awaiting_phases_is_superseded(phase):
     s = in_review().with_changes(phase=phase)
@@ -460,11 +584,11 @@ def test_result_outside_the_awaiting_phases_is_superseded(phase):
     assert app.disposition == "superseded" and app.result is None
 
 
-def test_result_in_the_notebook_phase_is_still_applied_while_the_child_revises():
+def test_result_after_revise_record_is_superseded():  # R27: o artefato pendente foi abandonado
     app = apply_analysis_result(
         _revising_pending(), result_for("job-1", "art-1", 1), content=CONTENT
     )
-    assert app.disposition == "applied" and app.result.session.phase == "notebook"
+    assert app.disposition == "superseded" and app.result is None
 
 
 def test_late_result_after_the_transfer_attempt_ended_in_summary_is_superseded():

@@ -433,6 +433,9 @@ def close_session(ctx: Ctx) -> Outcome:
             events.append(_outcome_event(ctx.content, attempt, final=True))
         updated = _with_attempt(s, attempt.with_changes(status="closed"))
     completion = "complete" if reason == "completed" else "partial"
+    # A análise pendente não terá mais onde ser aplicada (o resultado será descartado).
+    updated, dropped = drop_artifact(updated, reason="session_closed", clear_completed=False)
+    events += dropped
     updated = updated.with_changes(
         session_status="closed",
         completion=completion,

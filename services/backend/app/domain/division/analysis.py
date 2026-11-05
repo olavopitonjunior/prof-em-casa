@@ -30,10 +30,10 @@ __all__ = [
 
 Disposition = Literal["applied", "already_applied", "superseded", "deferred", "discarded"]
 
-# Fases em que um resultado vigente ainda tem onde ser aplicado: a revisão e, enquanto a criança
-# revisa o registro (revise_record), o caderno. Spec §8: "reconciliar ... na fase notebook_review".
-# `source_review` é da análise da fonte, que não usa `active_artifact`.
-_ANALYSIS_PHASES = frozenset({"notebook_review", "notebook"})
+# Única fase em que um resultado vigente é aplicado (Spec §8: reconciliar na `notebook_review`).
+# `source_review` é da análise da fonte, que não usa `active_artifact`. Quem sai da revisão com a
+# análise pendente abandona o artefato (R27), então nenhuma outra fase tem o que receber.
+_ANALYSIS_PHASES = frozenset({"notebook_review"})
 
 
 class AnalysisResult(BaseModel):

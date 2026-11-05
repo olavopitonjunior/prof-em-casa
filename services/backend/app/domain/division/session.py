@@ -18,6 +18,7 @@ from app.domain.division.state import (
     CommandResult,
     DomainEvent,
     SessionState,
+    drop_artifact,
     new_session,
 )
 from app.domain.division.transitions import is_allowed_in, next_phase
@@ -36,6 +37,20 @@ __all__ = [
 _IMMEDIATE_CONTROL = frozenset({"pause_session", "interrupt_turn"})
 # Com a sessão em pausa, tutor e sistema não agem (Parte I §4), salvo controle de sessão.
 _ALLOWED_WHILE_PAUSED = frozenset({"pause_session", "interrupt_turn", "close_session"})
+
+
+_CAPTURE_FLOW = frozenset({"notebook_capture", "notebook_review"})
+
+
+def _leave_reason(session: SessionState, command: Command) -> str:
+    """Motivo do analysis_superseded quando a transição sai do fluxo de captura."""
+    if command.type == "enter_notebook" and session.phase == "notebook_review":
+        return "revise_record"
+    return {
+        "cancel_capture": "left_capture",
+        "return_to_activity": "left_notebook",
+        "enter_notebook": "left_flow",
+    }.get(command.type, "left_flow")
 
 
 def _is_immediate_control(command: Command, actor: Actor) -> bool:
@@ -91,20 +106,27 @@ def apply_command(
     outcome = handler(Ctx(session, command, actor, content, explanation_evaluator))
 
     phase = next_phase(ctype, facts_of(session, answer_correct=outcome.answer_correct))
+    # R27: análise pendente só existe em notebook_capture/notebook_review. Quem sai desse fluxo a
+    # abandona, com um analysis_superseded (R26). Análise já concluída fica como evidência.
+    events = list(outcome.events)
+    outcome_session = outcome.session
+    if phase not in _CAPTURE_FLOW:
+        outcome_session, dropped = drop_artifact(
+            outcome_session, reason=_leave_reason(session, command), clear_completed=False
+        )
+        events += dropped
     scene_revision = session.scene_revision + (1 if outcome.scene_changed else 0)
-    scene = outcome.session.scene
+    scene = outcome_session.scene
     if outcome.scene_changed and scene is not None:
         scene = SceneState.model_validate({**dict(scene), "scene_revision": scene_revision})
-    final = outcome.session.with_changes(
+    final = outcome_session.with_changes(
         phase=phase,
         scene=scene,
         revision=session.revision + 1,
         scene_revision=scene_revision,
-        last_event_seq=session.last_event_seq + len(outcome.events),
+        last_event_seq=session.last_event_seq + len(events),
     )
-    return CommandResult(
-        session=final, events=tuple(outcome.events), scene_changed=outcome.scene_changed
-    )
+    return CommandResult(session=final, events=tuple(events), scene_changed=outcome.scene_changed)
 
 
 _SCENE_RESOURCES = frozenset({"virtual_objects", "reference_model"})
