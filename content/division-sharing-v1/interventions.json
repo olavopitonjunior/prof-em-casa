@@ -1,0 +1,9 @@
+{
+  "compare_groups": "Vamos olhar dois recipientes juntos? Eles têm a mesma quantidade de peças?",
+  "check_total_use": "Será que todas as peças já foram usadas? Dê uma olhada nas peças que ainda estão fora dos recipientes.",
+  "offer_guided_round": "Quer fazer uma rodada comigo? Eu mostro um passo e depois você continua.",
+  "relate_divisor_to_containers": "Quantos recipientes temos? Cada recipiente precisa ficar com a mesma quantidade de peças.",
+  "count_one_group": "Vamos contar as peças de um recipiente, uma a uma?",
+  "confirm_motor_intent": "Você queria mover essa peça? Se ficar mais fácil, pode tocar no lugar onde ela deve ficar.",
+  "alternate_strategy_20_4": "Podemos separar 24 em 20 e 4. Primeiro distribuímos as 20 peças, depois as 4 que faltam."
+}

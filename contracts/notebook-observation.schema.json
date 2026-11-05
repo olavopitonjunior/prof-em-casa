@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NotebookObservation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "artifact_id",
+    "attempt_id",
+    "artifact_version",
+    "status",
+    "expression",
+    "groups",
+    "ambiguities",
+    "model_ref",
+    "prompt_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "enum": [
+        "usable",
+        "needs_clarification"
+      ]
+    },
+    "expression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dividend",
+        "divisor",
+        "answer",
+        "bbox",
+        "uncertain"
+      ],
+      "properties": {
+        "dividend": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -9999,
+          "maximum": 9999
+        },
+        "divisor": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -9999,
+          "maximum": 9999
+        },
+        "answer": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -9999,
+          "maximum": 9999
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/bbox"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uncertain": {
+          "type": "boolean"
+        }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "group_id",
+          "count",
+          "bbox",
+          "provenance",
+          "uncertain"
+        ],
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 60
+          },
+          "bbox": {
+            "$ref": "#/$defs/bbox"
+          },
+          "provenance": {
+            "const": "image"
+          },
+          "uncertain": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "count": {
+                  "type": "null"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "uncertain": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ambiguities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field_path",
+          "reason"
+        ],
+        "properties": {
+          "field_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "enum": [
+              "illegible",
+              "missing",
+              "overlap",
+              "cropped",
+              "conflicting_marks",
+              "unsupported_representation"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "bbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "needs_clarification"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "ambiguities": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}

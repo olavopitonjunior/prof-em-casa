@@ -1,0 +1,184 @@
+{
+  "scene_id": "scene-guided-001",
+  "scene_revision": 9,
+  "attempt_id": "attempt-guided-001",
+  "task": {
+    "dividend": 24,
+    "divisor": 4,
+    "unit": "peças"
+  },
+  "projection": "perspective",
+  "interaction": "learner",
+  "groups": [
+    {
+      "id": "group-1",
+      "piece_ids": [
+        "piece-01",
+        "piece-02",
+        "piece-03",
+        "piece-04",
+        "piece-05"
+      ]
+    },
+    {
+      "id": "group-2",
+      "piece_ids": [
+        "piece-06",
+        "piece-07",
+        "piece-08",
+        "piece-09",
+        "piece-10"
+      ]
+    },
+    {
+      "id": "group-3",
+      "piece_ids": [
+        "piece-11",
+        "piece-12",
+        "piece-13",
+        "piece-14",
+        "piece-15"
+      ]
+    },
+    {
+      "id": "group-4",
+      "piece_ids": [
+        "piece-16",
+        "piece-17",
+        "piece-18",
+        "piece-19",
+        "piece-20"
+      ]
+    }
+  ],
+  "available_piece_ids": [
+    "piece-21",
+    "piece-22",
+    "piece-23",
+    "piece-24"
+  ],
+  "pieces": [
+    {
+      "id": "piece-01",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-1"
+    },
+    {
+      "id": "piece-02",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-1"
+    },
+    {
+      "id": "piece-03",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-1"
+    },
+    {
+      "id": "piece-04",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-1"
+    },
+    {
+      "id": "piece-05",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-1"
+    },
+    {
+      "id": "piece-06",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-2"
+    },
+    {
+      "id": "piece-07",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-2"
+    },
+    {
+      "id": "piece-08",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-2"
+    },
+    {
+      "id": "piece-09",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-2"
+    },
+    {
+      "id": "piece-10",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-2"
+    },
+    {
+      "id": "piece-11",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-3"
+    },
+    {
+      "id": "piece-12",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-3"
+    },
+    {
+      "id": "piece-13",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-3"
+    },
+    {
+      "id": "piece-14",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-3"
+    },
+    {
+      "id": "piece-15",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-3"
+    },
+    {
+      "id": "piece-16",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-4"
+    },
+    {
+      "id": "piece-17",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-4"
+    },
+    {
+      "id": "piece-18",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-4"
+    },
+    {
+      "id": "piece-19",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-4"
+    },
+    {
+      "id": "piece-20",
+      "origin": "image",
+      "observation_ref": "obs-001/photo-group-4"
+    },
+    {
+      "id": "piece-21",
+      "origin": "task_derived",
+      "observation_ref": null
+    },
+    {
+      "id": "piece-22",
+      "origin": "task_derived",
+      "observation_ref": null
+    },
+    {
+      "id": "piece-23",
+      "origin": "task_derived",
+      "observation_ref": null
+    },
+    {
+      "id": "piece-24",
+      "origin": "task_derived",
+      "observation_ref": null
+    }
+  ],
+  "highlighted_ids": [],
+  "answer_display": null
+}

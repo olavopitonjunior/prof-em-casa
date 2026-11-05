@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "observation_id": "obs-002",
+  "artifact_id": "artifact-notebook-002",
+  "attempt_id": "attempt-guided-001",
+  "artifact_version": 2,
+  "status": "needs_clarification",
+  "expression": {
+    "dividend": 24,
+    "divisor": 4,
+    "answer": 5,
+    "bbox": {
+      "x": 0.1,
+      "y": 0.75,
+      "width": 0.6,
+      "height": 0.12
+    },
+    "uncertain": false
+  },
+  "groups": [
+    {
+      "group_id": "photo-group-1",
+      "count": 5,
+      "bbox": {
+        "x": 0.05,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": false
+    },
+    {
+      "group_id": "photo-group-2",
+      "count": 5,
+      "bbox": {
+        "x": 0.28,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": false
+    },
+    {
+      "group_id": "photo-group-3",
+      "count": null,
+      "bbox": {
+        "x": 0.51,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": true
+    },
+    {
+      "group_id": "photo-group-4",
+      "count": 5,
+      "bbox": {
+        "x": 0.74,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": false
+    }
+  ],
+  "ambiguities": [
+    {
+      "field_path": "/groups/2/count",
+      "reason": "overlap"
+    }
+  ],
+  "model_ref": "synthetic-fixture-not-a-model-run",
+  "prompt_version": "fixture-1"
+}

@@ -1,0 +1,41 @@
+[
+  {
+    "item_id": "demo-12-4",
+    "role": "demonstration",
+    "task": {"dividend": 12, "divisor": 4, "unit": "peças"},
+    "statement": "Veja comigo: temos 12 peças e 4 recipientes. Vamos distribuir todas as peças entre os recipientes, de modo que todos fiquem com a mesma quantidade.",
+    "private": {
+      "quotient": 3,
+      "explanation_criteria": [
+        "relaciona os 4 grupos com 3 peças em cada",
+        "reconhece o total de 12 peças distribuídas"
+      ]
+    }
+  },
+  {
+    "item_id": "guided-24-4",
+    "role": "guided",
+    "task": {"dividend": 24, "divisor": 4, "unit": "peças"},
+    "statement": "Temos 24 peças e 4 recipientes. Distribua todas as peças entre os recipientes, de modo que todos fiquem com a mesma quantidade.\n\nQuantas peças ficam em cada recipiente? Represente sua ideia com um desenho e escreva a conta.",
+    "private": {
+      "quotient": 6,
+      "explanation_criteria": [
+        "relaciona os 4 grupos com 6 peças em cada",
+        "reconhece o total de 24 peças distribuídas"
+      ]
+    }
+  },
+  {
+    "item_id": "transfer-20-5",
+    "role": "transfer",
+    "task": {"dividend": 20, "divisor": 5, "unit": "peças"},
+    "statement": "Temos 20 peças e 5 recipientes. Distribua todas as peças igualmente entre os recipientes.\n\nQuantas peças ficam em cada recipiente? Mostre como você conferiu.",
+    "private": {
+      "quotient": 4,
+      "explanation_criteria": [
+        "relaciona os 5 grupos com 4 peças em cada",
+        "reconhece o total de 20 peças distribuídas"
+      ]
+    }
+  }
+]

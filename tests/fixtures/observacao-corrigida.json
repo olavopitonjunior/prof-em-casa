@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "observation_id": "obs-003",
+  "artifact_id": "artifact-notebook-003",
+  "attempt_id": "attempt-guided-001",
+  "artifact_version": 3,
+  "status": "usable",
+  "expression": {
+    "dividend": 24,
+    "divisor": 4,
+    "answer": 6,
+    "bbox": {
+      "x": 0.1,
+      "y": 0.75,
+      "width": 0.6,
+      "height": 0.12
+    },
+    "uncertain": false
+  },
+  "groups": [
+    {
+      "group_id": "photo-group-1",
+      "count": 6,
+      "bbox": {
+        "x": 0.05,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": false
+    },
+    {
+      "group_id": "photo-group-2",
+      "count": 6,
+      "bbox": {
+        "x": 0.28,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": false
+    },
+    {
+      "group_id": "photo-group-3",
+      "count": 6,
+      "bbox": {
+        "x": 0.51,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": false
+    },
+    {
+      "group_id": "photo-group-4",
+      "count": 6,
+      "bbox": {
+        "x": 0.74,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.4
+      },
+      "provenance": "image",
+      "uncertain": false
+    }
+  ],
+  "ambiguities": [],
+  "model_ref": "synthetic-fixture-not-a-model-run",
+  "prompt_version": "fixture-1"
+}
